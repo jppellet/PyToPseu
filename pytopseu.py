@@ -2,6 +2,7 @@ import ast
 import os
 from enum import Enum, auto
 from os import path
+from pprint import pprint
 from typing import NamedTuple
 
 
@@ -102,12 +103,24 @@ class OutStr(NamedTuple):
     allow_break: bool
 
 
+class NameType(Enum):
+    MODULE = auto()
+    VAR = auto()
+    FUNC = auto()
+    CLASS = auto()
+    VAR_FUNC_CLASS = auto()
+
+    def __repr__(self) -> str:
+        return self.name
+
+
 class Analyzer(ast.NodeVisitor):
     def __init__(self, format: Format) -> None:
         self.format = format
         self._out_buffer: list[OutStr] = []
         self._indent: int = 0
         self._stack: list[ast.AST] = []
+        self._names: dict[str, NameType] = {}
 
     def indent(self) -> None:
         self._indent += 1
@@ -120,6 +133,14 @@ class Analyzer(ast.NodeVisitor):
     ) -> None:
         line = CURRENT_LINE if node is None else node.lineno
         self._out_buffer.append(OutStr(line + linedelta, self._indent, str, allow_break))
+
+    def dump_names(self) -> None:
+        names: dict[NameType, list[str]] = {t: [] for t in NameType}
+        for name, t in self._names.items():
+            names[t].append(name)
+        for t, ns in names.items():
+            if ns:
+                print(f"{repr(t)}: {', '.join(ns)}")
 
     def visit(self, node: ast.AST | None, insert_brace_if_complex=False) -> None:
         if node is None:
@@ -148,15 +169,21 @@ class Analyzer(ast.NodeVisitor):
         imports = [f"{var(alias.name)}" for alias in node.names]
         what = "les modules" if len(imports) > 1 else "le module"
         self.append(node, f"on va utiliser {what} {', '.join(imports)}")
+        for alias in node.names:
+            name = alias.asname or alias.name
+            self.new_name(name, NameType.MODULE)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         module = node.module
         imports = [
-            f"{var(alias.name)}{f" (en l'appelant {var(alias.asname)}" if alias.asname else ""}"
+            f"{var(alias.name)}{f" (en l'appelant {var(alias.asname)})" if alias.asname else ""}"
             for alias in node.names
         ]
         what = "les éléments" if len(imports) > 1 else "l'élément"
         self.append(node, f"on va utiliser {what} {', '.join(imports)} du module {var(module or '')}")
+        for alias in node.names:
+            name = alias.asname or alias.name
+            self.new_name(name, NameType.VAR_FUNC_CLASS)
 
     def visit_Expr(self, node: ast.Expr) -> None:
         self.visit(node.value)
@@ -187,16 +214,34 @@ class Analyzer(ast.NodeVisitor):
                         self.append(node, " en nombres entiers")
                 case _:
                     self.append(node, f"dans {var(target)}, stocke ")
-                    self.visit(node.value)
+                    self.visit_stored(node.value)
         else:
             unhandled("multiple assignment")
 
+        for varname in node.targets:
+            self.new_name(varname, NameType.VAR)
+
+    def visit_stored(self, node: ast.expr) -> None:
+        match node:
+            case ast.Compare() | ast.BoolOp(ast.Or() | ast.And(), _):
+                self.append(node, "Vrai/Faux selon si ")
+                self.visit(node)
+            case _:
+                self.visit(node)
+
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
-        self.append(
-            node,
-            f"dans {var(unparsed(node.target))}, prévu pour {readable_type(node.annotation)}, stocke ",
-        )
-        self.visit(node.value)
+        if node.value is None:
+            self.append(
+                node,
+                f"on prépare {var(unparsed(node.target))} pour y stocker un {readable_type(node.annotation)}",
+            )
+        else:
+            self.append(
+                node, f"dans {var(unparsed(node.target))}, prévu pour {readable_type(node.annotation)},"
+            )
+            self.append(node, f" stocke ", allow_break=True)
+            self.visit_stored(node.value)
+        self.new_name(node.target, NameType.VAR)
 
     def visit_AugAssign(self, node: ast.AugAssign) -> None:
         ident = unparsed(node.target)
@@ -225,16 +270,47 @@ class Analyzer(ast.NodeVisitor):
                 self.visit(node.value)
             case _:
                 self.append(node, f"dans {var(ident)}, stocke le résultat de {var(ident)} {node.op} ")
-                self.visit(node.value)
+                self.visit_stored(node.value)
+        self.new_name(node.target, NameType.VAR)
+
+    def visit_JoinedStr(self, node: ast.JoinedStr) -> None:
+        self.append(node, f"l'expansion de {unparsed(node)[1:]}")
+
+    def new_name(self, node: ast.expr, t: NameType) -> None:
+        match node:
+            case ast.Name(id):
+                self._names[id] = t
+            case _:
+                pass
+
+    def name_is(self, name: str, t: NameType) -> bool:
+        return self._names.get(name) == t
 
     def visit_Constant(self, node: ast.Constant) -> None:
-        if isinstance(node.value, str):
-            if len(node.value) == 0:
-                self.append(node, "une chaîne de caractères vide")
-            else:
-                self.append(node, f'"{node.value}"')
-        else:
-            self.append(node, f"{node.value}")
+        match node.value:
+            case str(value):
+                if len(value) == 0:
+                    self.append(node, "une chaîne de caractères vide")
+                else:
+                    self.append(node, f'"{value}"')
+            case x if x == Ellipsis:
+                self.append(node, "une valeur à définir")
+            case _:
+                self.append(node, f"{node.value}")
+
+    def visit_UnaryOp(self, node: ast.UnaryOp) -> None:
+        match node.op:
+            case ast.USub():
+                self.append(node, "l'opposé de ")
+                self.visit(node.operand)
+            case ast.UAdd():
+                # self.append(node, "le même que ")
+                self.visit(node.operand)
+            case ast.Not():
+                self.append(node, "le contraire de ")
+                self.visit(node.operand, insert_brace_if_complex=True)
+            case _:
+                unhandled(f"unary operator: {type(node.op).__name__}")
 
     def visit_BinOp(self, node: ast.BinOp) -> None:
         # detect modulo-zero checks
@@ -309,6 +385,39 @@ class Analyzer(ast.NodeVisitor):
             case "math.sqrt":
                 self.append(node, "la racine carrée de ")
                 self.visit(args[0])
+            case "math.ceil":
+                self.append(node, "l’arrondi supérieur de ")
+                self.visit(args[0])
+            case "math.floor":
+                self.append(node, "l’arrondi inférieur de ")
+                self.visit(args[0])
+            case "math.sin":
+                self.append(node, "le sinus de ")
+                self.visit(args[0])
+            case "math.cos":
+                self.append(node, "le cosinus de ")
+                self.visit(args[0])
+            case "math.tan":
+                self.append(node, "la tangente de ")
+                self.visit(args[0])
+            case "round":
+                self.append(node, "l’arrondi de ")
+                self.visit(args[0])
+            case "input":
+                if args:
+                    self.append(node, "la réponse de l'utilisateur à la question ")
+                    self.visit(args[0])
+                else:
+                    self.append(node, "ce que l'utilisateur va taper")
+            case "str":
+                self.append(node, "la conversion en chaîne de caractères de ")
+                self.visit(args[0])
+            case "float":
+                self.append(node, "la conversion en nombre à virgule de ")
+                self.visit(args[0])
+            case "int":
+                self.append(node, "la conversion en nombre entier de ")
+                self.visit(args[0])
             case "abs":
                 self.append(node, "la valeur absolue de ")
                 self.visit(args[0])
@@ -341,15 +450,69 @@ class Analyzer(ast.NodeVisitor):
                 if step is not None and not (isinstance(step, ast.Constant) and step.value == 1):
                     self.append(node, f" avec un pas de ")
                     self.visit(step, insert_brace_if_complex=True)
+
             case _:
-                self.append(node, f"appelle la fonction {funcname} ")
-                for i, arg in enumerate(args):
-                    if i > 0:
-                        self.append(node, ", ")
-                    self.visit(arg)
+
+                def append_args(first_prefix: str = "avec ") -> None:
+                    for i, arg in enumerate(args):
+                        if i > 0:
+                            self.append(node, ", ")
+                        elif first_prefix:
+                            self.append(node, first_prefix)
+                        self.visit(arg)
+
+                match node.func:
+                    case ast.Attribute(expr, method):
+
+                        def append_expr():
+                            self.visit(expr, insert_brace_if_complex=True)
+
+                        match method:
+                            case "startswith":
+                                append_expr()
+                                self.append(node, f" commence par ")
+                                append_args(first_prefix="")
+                            case "endswith":
+                                append_expr()
+                                self.append(node, f" finit par ")
+                                append_args(first_prefix="")
+                            case "upper":
+                                self.append(node, f"une copie tout en majuscules de ")
+                                append_expr()
+                            case "lower":
+                                self.append(node, f"une copie tout en minuscules de ")
+                                append_expr()
+                            case "capitalize":
+                                self.append(node, f"une copie avec la première lettre en majuscule de ")
+                                append_expr()
+                            case "title":
+                                self.append(
+                                    node,
+                                    f"une copie avec la première lettre de chaque mot en majuscule de ",
+                                )
+                                append_expr()
+                            case "strip":
+                                self.append(node, f"une copie sans espaces de début et de fin de ")
+                                append_expr()
+                            case "lstrip":
+                                self.append(node, f"une copie sans espaces de début de ")
+                                append_expr()
+                            case "rstrip":
+                                self.append(node, f"une copie sans espaces de fin de ")
+                                append_expr()
+                            case _:
+                                self.append(node, f"le résultat de la méthode {var(method)} de ")
+                                append_expr()
+                                append_args()
+                    case _:
+                        self.append(node, f"le résultat de la fonction {funcname} ")
+                        append_args()
 
     def visit_Name(self, node: ast.Name) -> None:
         self.append(node, var(node.id))
+
+    def visit_Pass(self, node: ast.Pass) -> None:
+        self.append(node, "ne fais rien de spécial")
 
     def visit_For(self, node: ast.For) -> None:
         # loop variable
@@ -438,7 +601,7 @@ class Analyzer(ast.NodeVisitor):
                     else:
                         # upper is given
                         self.append(node, "les ")
-                        self.visit(upper)
+                        self.visit(upper, insert_brace_if_complex=True)
                         self.append(node, " premiers éléments de ")
                         self.visit(node.value)
                 else:
@@ -545,7 +708,7 @@ def is_complex_node(node: ast.AST) -> bool:
     """
     Nodes that should be enclosed in ⟨⟩ in a pseudocode subexpression
     """
-    return not isinstance(node, (ast.Constant, ast.Name))
+    return not isinstance(node, (ast.Constant, ast.Name, ast.Subscript))
 
 
 def num_zeros_if_power_of_10(value: int) -> int | None:
@@ -558,10 +721,19 @@ def num_zeros_if_power_of_10(value: int) -> int | None:
     return n if value == 1 else None
 
 
-def annotate(file: str, format: Format) -> None:
+def frenchify(s: str) -> str:
+    return (
+        s.replace(" de les ", " des ")
+        .replace(" de le ", " du ")
+        .replace(" à le ", " au ")
+        .replace(" à les ", " aux ")
+    )
+
+
+def annotate(file: str, format: Format, dump_ast: bool = False) -> None:
     print(f"Processing '{file}'")
 
-    MAX_LINE_WIDTH = 80
+    MAX_LINE_WIDTH = 60
     V_BAR = "│"
     PYTHON_ANN_SEP = "#" + V_BAR
     CONTINUATION_MARK = "└╴"
@@ -585,10 +757,17 @@ def annotate(file: str, format: Format) -> None:
         and src_lines[1].startswith("Source")
     ):
         src_lines = src_lines[4:]
+
     tree = ast.parse("\n".join(src_lines), type_comments=True)
+
+    if dump_ast:
+        print(ast.dump(tree, indent=4))
 
     analyzer = Analyzer(format)
     analyzer.visit(tree)
+
+    if dump_ast:
+        analyzer.dump_names()
 
     num_lines = max(map(lambda x: x.line, analyzer._out_buffer))
     lines: list[str] = [""] * (num_lines + 1)
@@ -645,6 +824,7 @@ def annotate(file: str, format: Format) -> None:
         )
         out_file.write(header_sep)
         for src, pseu in zip(src_lines, lines):
+            pseu = frenchify(pseu)
             out_file.write(f"{format_code_line(src):{max_src_width}}{margin_left}{sep}{margin_right}{pseu}\n")
 
     print(f"Output written to '{outfile}'\n")
@@ -659,4 +839,6 @@ def annotate_all(format: Format) -> None:
 if __name__ == "__main__":
     format = Format.PYTHON
     # annotate_all(format)
-    annotate("sample_src/sample9.py", format)
+    annotate("sample_src/lectures_1to5.py", format)
+    # annotate("sample_src/sample9.py", format)
+    # annotate("sample_src/test.py", format, dump_ast=True)

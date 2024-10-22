@@ -3,7 +3,7 @@ Source                       #│    Pseudocode
 -----------------------------#│--------------------------------
 """                          #│
 import math                  #│    on va utiliser le module m̲a̲t̲h̲
-from sys import exit as ex   #│    on va utiliser l'élément e̲x̲i̲t̲ (en l'appelant e̲x̲ du module s̲ys̲
+from sys import exit as ex   #│    on va utiliser l'élément e̲x̲i̲t̲ (en l'appelant e̲x̲) du module s̲ys̲
                              #│    
 a: int = 4                   #│    dans a̲, prévu pour un nombre entier, stocke 4
 b: float = 4 * 6             #│    dans b̲, prévu pour un nombre à virgule, stocke le produit 4 × 6
