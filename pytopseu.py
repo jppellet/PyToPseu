@@ -224,7 +224,7 @@ class Analyzer(ast.NodeVisitor):
     def visit_stored(self, node: ast.expr) -> None:
         match node:
             case ast.Compare() | ast.BoolOp(ast.Or() | ast.And(), _):
-                self.append(node, "Vrai/Faux selon si ")
+                self.append(node, "vrai/faux selon si ")
                 self.visit(node)
             case _:
                 self.visit(node)
@@ -417,6 +417,9 @@ class Analyzer(ast.NodeVisitor):
                 self.visit(args[0])
             case "int":
                 self.append(node, "la conversion en nombre entier de ")
+                self.visit(args[0])
+            case "bool":
+                self.append(node, "la conversion en vrai/faux de ")
                 self.visit(args[0])
             case "abs":
                 self.append(node, "la valeur absolue de ")
@@ -634,7 +637,7 @@ class Analyzer(ast.NodeVisitor):
 
     def visit_If(self, node: ast.If) -> None:
         self.append(node, "si ")
-        self.visit(node.test)
+        self.visit_cond(node.test)
         self.append(node, ":")
         self.indent()
         for stmt in node.body:
@@ -652,6 +655,19 @@ class Analyzer(ast.NodeVisitor):
                     self.visit(stmt)
                 self.outdent()
 
+    def visit_cond(self, node: ast.expr) -> None:
+        match node:
+            case ast.Compare() | ast.BoolOp():
+                self.visit(node)
+            case ast.UnaryOp(ast.Not(), expr):
+                self.visit(expr, insert_brace_if_complex=True)
+                self.append(node, " est faux")
+            case ast.Name():
+                self.visit(node, insert_brace_if_complex=True)
+                self.append(node, " est vrai")
+            case _:
+                self.visit(node)
+
     def visit_BoolOp(self, node: ast.BoolOp) -> None:
         first_level_condition = isinstance(self._stack[-2], (ast.If, ast.While))
         suffix = "" if not first_level_condition else " que"
@@ -661,7 +677,7 @@ class Analyzer(ast.NodeVisitor):
         for i, value in enumerate(node.values):
             if i > 0:
                 self.append(node, f" {op_str} ")
-            self.visit(value)
+            self.visit_cond(value)
 
     def visit_Compare(self, node: ast.Compare) -> None:
         match node:
@@ -684,10 +700,33 @@ class Analyzer(ast.NodeVisitor):
                     case (False, _):
                         self.append(node, f" n'est pas un multiple de {value}")
 
+            # Boolean checks
+            case ast.Compare(ast.Constant(True), [ast.Eq() | ast.Is()], [expr]) | ast.Compare(expr, [ast.Eq()| ast.Is()], [ast.Constant(True)]):
+                self.visit(expr)
+                self.append(node, " est vrai")
+            case ast.Compare(ast.Constant(False), [ast.Eq() | ast.Is()], [expr]) | ast.Compare(expr, [ast.Eq()| ast.Is()], [ast.Constant(False)]):
+                self.visit(expr)
+                self.append(node, " est faux")
+            case ast.Compare(ast.Constant(True), [ast.NotEq() | ast.IsNot()], [expr]) | ast.Compare(expr, [ast.NotEq()| ast.IsNot()], [ast.Constant(True)]):
+                self.visit(expr)
+                self.append(node, " n'est pas vrai")
+            case ast.Compare(ast.Constant(False), [ast.NotEq() | ast.IsNot()], [expr]) | ast.Compare(expr, [ast.NotEq()| ast.IsNot()], [ast.Constant(False)]):
+                self.visit(expr)
+                self.append(node, " n'est pas faux")
+
+            # None checks
+            case ast.Compare(ast.Constant(None), [ast.Eq() | ast.Is()], [expr]) | ast.Compare(expr, [ast.Eq()| ast.Is()], [ast.Constant(None)]):
+                self.visit(expr)
+                self.append(node, " est vide")
+
+            case ast.Compare(ast.Constant(None), [ast.NotEq() | ast.IsNot()], [expr]) | ast.Compare(expr, [ast.NotEq()| ast.IsNot()], [ast.Constant(None)]):
+                self.visit(expr)
+                self.append(node, " n'est pas vide")
+
             # standard single-op comparisons
             case ast.Compare(left, [op], [right]):
-                is_in = isinstance(op, ast.In)
-                is_not_in = isinstance(op, ast.NotIn)
+                # is_in = isinstance(op, ast.In)
+                # is_not_in = isinstance(op, ast.NotIn)
                 # reverse for legibility
                 # if is_in or is_not_in:
                 #     self.visit(right)
@@ -838,7 +877,7 @@ def annotate_all(format: Format) -> None:
 
 if __name__ == "__main__":
     format = Format.PYTHON
-    # annotate_all(format)
-    annotate("sample_src/lectures_1to5.py", format)
+    annotate_all(format)
+    # annotate("sample_src/lectures_1to5.py", format)
     # annotate("sample_src/sample9.py", format)
     # annotate("sample_src/test.py", format, dump_ast=True)

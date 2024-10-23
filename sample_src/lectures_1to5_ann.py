@@ -119,53 +119,53 @@ if x > 1 and x < 100:                                     #│    si x̲ est plu
     pass                                                  #│    │   ne fais rien de spécial
 if x > 1 or x < 100:                                      #│    si x̲ est plus grand que 1 ou que x̲ est plus petit que 100:
     pass                                                  #│    │   ne fais rien de spécial
-if not (x > 1):                                           #│    si le contraire de ⟨x̲ est plus grand que 1⟩:
+if not (x > 1):                                           #│    si ⟨x̲ est plus grand que 1⟩ est faux:
     pass                                                  #│    │   ne fais rien de spécial
-if (not x > 1) or (x > 1 and x < 100):                    #│    si le contraire de ⟨x̲ est plus grand que 1⟩ ou que x̲ est plus grand que 1 et x̲ est plus petit que 100:
+if (not x > 1) or (x > 1 and x < 100):                    #│    si ⟨x̲ est plus grand que 1⟩ est faux ou que x̲ est plus grand que 1 et x̲ est plus petit que 100:
     pass                                                  #│    │   ne fais rien de spécial
                                                           #│    
                                                           #│    
                                                           #│    
 name: str = input("Tapez votre nom: ")                    #│    dans n̲a̲m̲e̲, prévu pour une chaîne de caractères, stocke la réponse de l'utilisateur à la question "Tapez votre nom: "
 is_compound_name: bool = "-" in name or " " in name       #│    dans i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲, prévu pour une valeur booléenne,
-                                                          #│    │     └╴ stocke Vrai/Faux selon si "-" fait partie de n̲a̲m̲e̲ ou " " fait partie de n̲a̲m̲e̲
+                                                          #│    │     └╴ stocke vrai/faux selon si "-" fait partie de n̲a̲m̲e̲ ou " " fait partie de n̲a̲m̲e̲
 is_long_name: bool = len(name) > 10                       #│    dans i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲, prévu pour une valeur booléenne,
-                                                          #│    │     └╴ stocke Vrai/Faux selon si la longueur de n̲a̲m̲e̲ est plus grand que 10
+                                                          #│    │     └╴ stocke vrai/faux selon si la longueur de n̲a̲m̲e̲ est plus grand que 10
                                                           #│    
                                                           #│    
-if is_compound_name and is_long_name:                     #│    si i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲ et que i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲:
+if is_compound_name and is_long_name:                     #│    si i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲ est vrai et que i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲ est vrai:
     print("Votre nom est long et composé")                #│    │   affiche "Votre nom est long et composé"
-elif is_compound_name and not is_long_name:               #│    sinon, si i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲ et que le contraire de i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲:
+elif is_compound_name and not is_long_name:               #│    sinon, si i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲ est vrai et que i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲ est faux:
     print("Votre nom est composé mais pas long")          #│    │   affiche "Votre nom est composé mais pas long"
-elif not is_compound_name and is_long_name:               #│    sinon, si le contraire de i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲ et que i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲:
+elif not is_compound_name and is_long_name:               #│    sinon, si i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲ est faux et que i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲ est vrai:
     print("Votre nom est long mais pas composé")          #│    │   affiche "Votre nom est long mais pas composé"
-elif not is_compound_name and not is_long_name:           #│    sinon, si le contraire de i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲ et que le contraire de i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲:
+elif not is_compound_name and not is_long_name:           #│    sinon, si i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲ est faux et que i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲ est faux:
     print("Votre nom est court et simple")                #│    │   affiche "Votre nom est court et simple"
                                                           #│    
                                                           #│    
 name: str = input("Tapez votre nom: ")                    #│    dans n̲a̲m̲e̲, prévu pour une chaîne de caractères, stocke la réponse de l'utilisateur à la question "Tapez votre nom: "
 is_compound_name: bool = "-" in name or " " in name       #│    dans i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲, prévu pour une valeur booléenne,
-                                                          #│    │     └╴ stocke Vrai/Faux selon si "-" fait partie de n̲a̲m̲e̲ ou " " fait partie de n̲a̲m̲e̲
+                                                          #│    │     └╴ stocke vrai/faux selon si "-" fait partie de n̲a̲m̲e̲ ou " " fait partie de n̲a̲m̲e̲
 is_long_name: bool = len(name) > 10                       #│    dans i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲, prévu pour une valeur booléenne,
-                                                          #│    │     └╴ stocke Vrai/Faux selon si la longueur de n̲a̲m̲e̲ est plus grand que 10
+                                                          #│    │     └╴ stocke vrai/faux selon si la longueur de n̲a̲m̲e̲ est plus grand que 10
                                                           #│    
                                                           #│    
-if is_compound_name and is_long_name:                     #│    si i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲ et que i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲:
+if is_compound_name and is_long_name:                     #│    si i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲ est vrai et que i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲ est vrai:
     print("Votre nom est long et composé")                #│    │   affiche "Votre nom est long et composé"
-elif is_compound_name and not is_long_name:               #│    sinon, si i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲ et que le contraire de i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲:
+elif is_compound_name and not is_long_name:               #│    sinon, si i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲ est vrai et que i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲ est faux:
     print("Votre nom est composé mais pas long")          #│    │   affiche "Votre nom est composé mais pas long"
-elif not is_compound_name and is_long_name:               #│    sinon, si le contraire de i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲ et que i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲:
+elif not is_compound_name and is_long_name:               #│    sinon, si i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲ est faux et que i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲ est vrai:
     print("Votre nom est long mais pas composé")          #│    │   affiche "Votre nom est long mais pas composé"
-elif not is_compound_name and not is_long_name:           #│    sinon, si le contraire de i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲ et que le contraire de i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲:
+elif not is_compound_name and not is_long_name:           #│    sinon, si i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲ est faux et que i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲ est faux:
     print("Votre nom est court et simple")                #│    │   affiche "Votre nom est court et simple"
                                                           #│    
-if is_compound_name:                                      #│    si i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲:
-    if is_long_name:                                      #│    │   si i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲:
+if is_compound_name:                                      #│    si i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲ est vrai:
+    if is_long_name:                                      #│    │   si i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲ est vrai:
         print("Votre nom est long et composé")            #│    │   │   affiche "Votre nom est long et composé"
     else:                                                 #│    │   sinon:
         print("Votre nom est composé mais pas long")      #│    │   │   affiche "Votre nom est composé mais pas long"
 else:                                                     #│    
-    if is_long_name:                                      #│    sinon, si i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲:
+    if is_long_name:                                      #│    sinon, si i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲ est vrai:
         print("Votre nom est long mais pas composé")      #│    │   affiche "Votre nom est long mais pas composé"
     else:                                                 #│    sinon:
         print("Votre nom est court et simple")            #│    │   affiche "Votre nom est court et simple"
