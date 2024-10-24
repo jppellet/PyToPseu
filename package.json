@@ -1,0 +1,45 @@
+{
+  "name": "pytopseu",
+  "version": "0.1.0",
+  "description": "A simple Python-to-pseudocode rewriter",
+  "main": "index.js",
+  "scripts": {
+    "compile": "tsc -p tsconfig.json",
+    "compile-watch": "tsc -p tsconfig.json --watch",
+    "lint": "eslint .",
+    "lint-watch": "npm-watch lint",
+    "bundle": "./tools/build.js",
+    "bundle-watch": "npm-watch bundle",
+    "server": "./tools/local_server.py 8089"
+  },
+  "watch": {
+    "bundle": {
+      "patterns": [
+        "web",
+        "pytopseu.py"
+      ],
+      "ignore": "simulator/lib",
+      "extensions": "ts,py"
+    },
+    "lint": {
+      "patterns": [
+        "web"
+      ],
+      "extensions": "ts"
+    }
+  },
+  "author": "Jean-Philippe Pellet",
+  "license": "MIT",
+  "dependencies": {
+    "@codemirror/lang-python": "^6.1.6",
+    "codemirror": "^6.0.1",
+    "pyodide": "^0.26.3"
+  },
+  "devDependencies": {
+    "@types/codemirror": "^5.60.15",
+    "esbuild": "^0.24.0",
+    "eslint": "^9.13.0",
+    "npm-watch": "^0.13.0",
+    "typescript": "^5.6.3"
+  }
+}
