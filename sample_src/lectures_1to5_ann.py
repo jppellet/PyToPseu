@@ -127,9 +127,9 @@ if (not x > 1) or (x > 1 and x < 100):                    #│   si ⟨x̲ est p
                                                           #│   
                                                           #│   
 name: str = input("Tapez votre nom: ")                    #│   dans n̲a̲m̲e̲, prévu pour une chaîne de caractères, stocke la réponse de l'utilisateur à la question "Tapez votre nom: "
-is_compound_name: bool = "-" in name or " " in name       #│   dans i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲, prévu pour une valeur booléenne,
+is_compound_name: bool = "-" in name or " " in name       #│   dans i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲, prévu pour une valeur vrai/faux,
                                                           #│   │     └╴ stocke vrai/faux selon si "-" fait partie de n̲a̲m̲e̲ ou " " fait partie de n̲a̲m̲e̲
-is_long_name: bool = len(name) > 10                       #│   dans i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲, prévu pour une valeur booléenne,
+is_long_name: bool = len(name) > 10                       #│   dans i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲, prévu pour une valeur vrai/faux,
                                                           #│   │     └╴ stocke vrai/faux selon si la longueur de n̲a̲m̲e̲ est plus grand que 10
                                                           #│   
                                                           #│   
@@ -144,9 +144,9 @@ elif not is_compound_name and not is_long_name:           #│   sinon, si i̲s�
                                                           #│   
                                                           #│   
 name: str = input("Tapez votre nom: ")                    #│   dans n̲a̲m̲e̲, prévu pour une chaîne de caractères, stocke la réponse de l'utilisateur à la question "Tapez votre nom: "
-is_compound_name: bool = "-" in name or " " in name       #│   dans i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲, prévu pour une valeur booléenne,
+is_compound_name: bool = "-" in name or " " in name       #│   dans i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲, prévu pour une valeur vrai/faux,
                                                           #│   │     └╴ stocke vrai/faux selon si "-" fait partie de n̲a̲m̲e̲ ou " " fait partie de n̲a̲m̲e̲
-is_long_name: bool = len(name) > 10                       #│   dans i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲, prévu pour une valeur booléenne,
+is_long_name: bool = len(name) > 10                       #│   dans i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲, prévu pour une valeur vrai/faux,
                                                           #│   │     └╴ stocke vrai/faux selon si la longueur de n̲a̲m̲e̲ est plus grand que 10
                                                           #│   
                                                           #│   

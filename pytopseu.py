@@ -2,7 +2,7 @@ import ast
 import json
 from enum import Enum
 from pprint import pprint
-from typing import NamedTuple
+from typing import Iterable, NamedTuple, TypeVar
 
 
 class Format(Enum):
@@ -14,6 +14,17 @@ class Format(Enum):
 # See https://docs.python.org/3/library/ast.html#module-ast
 
 CURRENT_LINE = -1
+
+T = TypeVar("T")
+
+
+def track_last(iterable: Iterable[T]) -> Iterable[tuple[T, bool]]:
+    it = iter(iterable)
+    prev = next(it)
+    for current in it:
+        yield prev, False
+        prev = current
+    yield prev, True
 
 
 def unparsed(expr: ast.AST) -> str:
@@ -30,7 +41,7 @@ def readable_type(expr: ast.expr) -> str:
         case "str":
             return "une chaîne de caractères"
         case "bool":
-            return "une valeur booléenne"
+            return "une valeur vrai/faux"
         case _:
             return s
 
@@ -135,7 +146,11 @@ class Analyzer(ast.NodeVisitor):
         self._indent -= 1
 
     def append(
-        self, node: ast.stmt | ast.expr | None, str: str, linedelta: int = 0, allow_break: bool = False
+        self,
+        node: ast.stmt | ast.expr | ast.arg | None,
+        str: str,
+        linedelta: int = 0,
+        allow_break: bool = False,
     ) -> None:
         line = CURRENT_LINE if node is None else node.lineno
         self._out_buffer.append(OutStr(line + linedelta, self._indent, str, allow_break))
@@ -192,6 +207,7 @@ class Analyzer(ast.NodeVisitor):
             self.new_name(name, NameType.VAR_FUNC_CLASS)
 
     def visit_Expr(self, node: ast.Expr) -> None:
+        # ast.Expr is an expr as a statement
         self.visit_stored(node.value)
 
     def visit_Assign(self, node: ast.Assign) -> None:
@@ -302,7 +318,7 @@ class Analyzer(ast.NodeVisitor):
             case x if x == Ellipsis:
                 self.append(node, "quelque chose à définir")
             case x if x == None:
-                self.append(node, "une valeur vide (None)")
+                self.append(node, "une valeur vide")
             case _:
                 self.append(node, f"{node.value}")
 
@@ -525,6 +541,86 @@ class Analyzer(ast.NodeVisitor):
     def visit_Pass(self, node: ast.Pass) -> None:
         self.append(node, "ne fais rien de spécial")
 
+    def visit_Break(self, node: ast.Break) -> None:
+        self.append(node, "sors de la boucle")
+
+    def visit_Continue(self, node: ast.Continue) -> None:
+        self.append(node, "passe à l'itération suivante")
+
+    def visit_Return(self, node: ast.Return) -> None:
+        if node.value is None:
+            self.append(node, "sors de la fonction")
+        else:
+            self.append(node, "sors de la fonction en renvoyant ")
+            self.visit(node.value)
+
+    def visit_Await(self, node: ast.Await) -> None:
+        self.append(node, "attends ")
+        self.visit(node.value)
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        self.append(node, f"définis la fonction {var(node.name)}, ")
+        for arg in node.args.args:
+            self.new_name(arg.arg, NameType.VAR)
+        num_args = len(node.args.args)
+        needs_and = num_args > 0
+
+        def append_arg(arg: ast.arg) -> None:
+            self.append(arg, var(arg.arg), allow_break=True)
+            if arg.annotation:
+                self.append(arg, " (")
+                self.append(arg, readable_type(arg.annotation))
+                self.append(arg, ")")
+
+        if num_args == 0:
+            self.append(node, "sans argument, ")
+        elif num_args == 1:
+            self.append(node, f"qui prend un argument, {var(node.args.args[0].arg)}, ")
+        else:
+            self.append(node, f"qui prend {num_args} arguments")
+            for arg, is_last in track_last(node.args.args):
+                if not is_last:
+                    self.append(node, ", ")
+                    append_arg(arg)
+                else:
+                    self.append(node, " et ")
+                    append_arg(arg)
+                    self.append(node, ", ")
+        if node.returns:
+            if needs_and:
+                self.append(node, "et ")
+            match node.returns:
+                case ast.Constant(None):
+                    self.append(node, "qui ne renvoie rien, ", allow_break=True)
+                case _:
+                    self.append(node, f"qui renvoie {readable_type(node.returns)}, ", allow_break=True)
+        self.append(node, "ainsi:")
+
+        self.indent()
+        for stmt in node.body:
+            self.visit(stmt)
+        self.outdent()
+
+    def visit_Lambda(self, node: ast.Lambda) -> None:
+
+        self.append(node, "une fonction anonyme")
+        for arg in node.args.args:
+            self.new_name(arg.arg, NameType.VAR)
+        num_args = len(node.args.args)
+        if num_args == 0:
+            self.append(node, " sans argument")
+        elif num_args == 1:
+            self.append(node, f" qui prend un argument, {var(node.args.args[0].arg)}, et")
+        else:
+            self.append(node, f" qui prend {num_args} arguments")
+            for arg, is_last in track_last(node.args.args):
+                if not is_last:
+                    self.append(node, f", {var(arg.arg)}")
+                else:
+                    self.append(node, f" et {var(arg.arg)}, et")
+        self.append(node, " qui renvoie ", allow_break=True)
+        self.visit(node.body)
+
     def visit_For(self, node: ast.For) -> None:
         # loop variable
         loop_var = unparsed(node.target)
@@ -589,13 +685,18 @@ class Analyzer(ast.NodeVisitor):
         self.outdent()
 
     def visit_While(self, node: ast.While) -> None:
-        self.append(node, "tant que ")
-        self.visit(node.test)
-        self.append(node, ":")
+        match node.test:
+            case ast.Constant(True | 1):
+                self.append(node, "répéter indéfiniment:")
+            case _:
+                self.append(node, "tant que ")
+                self.visit_cond(node.test)
+                self.append(node, ":")
         self.indent()
         for stmt in node.body:
             self.visit(stmt)
         self.outdent()
+        # TODO orelse part
 
     def visit_Subscript(self, node: ast.Subscript) -> None:
         match node.slice:
