@@ -164,8 +164,8 @@ if is_compound_name:                                      #│    si i̲s̲ ̲c�
         print("Votre nom est long et composé")            #│    │   │   affiche "Votre nom est long et composé"
     else:                                                 #│    │   sinon:
         print("Votre nom est composé mais pas long")      #│    │   │   affiche "Votre nom est composé mais pas long"
-else:                                                     #│    
-    if is_long_name:                                      #│    sinon, si i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲ est vrai:
-        print("Votre nom est long mais pas composé")      #│    │   affiche "Votre nom est long mais pas composé"
-    else:                                                 #│    sinon:
-        print("Votre nom est court et simple")            #│    │   affiche "Votre nom est court et simple"
+else:                                                     #│    sinon:
+    if is_long_name:                                      #│    │   si i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲ est vrai:
+        print("Votre nom est long mais pas composé")      #│    │   │   affiche "Votre nom est long mais pas composé"
+    else:                                                 #│    │   sinon:
+        print("Votre nom est court et simple")            #│    │   │   affiche "Votre nom est court et simple"

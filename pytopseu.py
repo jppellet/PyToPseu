@@ -7,9 +7,9 @@ from typing import NamedTuple
 
 
 class Format(Enum):
-    TEXT = auto()
-    MARKDOWN = auto()
-    PYTHON = auto()
+    TEXT = "txt"
+    MARKDOWN = "md"
+    PYTHON = "py"
 
 
 # See https://docs.python.org/3/library/ast.html#module-ast
@@ -61,8 +61,7 @@ def fake_double_underline(string: str) -> str:
 
 
 def var(name: str) -> str:
-    # return f"`{name}`" # markdown
-    return fake_underline(name)  # text
+    return fake_underline(name)
 
 
 def compop(op: ast.cmpop) -> str:
@@ -104,11 +103,11 @@ class OutStr(NamedTuple):
 
 
 class NameType(Enum):
-    MODULE = auto()
-    VAR = auto()
-    FUNC = auto()
-    CLASS = auto()
-    VAR_FUNC_CLASS = auto()
+    MODULE = "mod"
+    VAR = "var"
+    FUNC = "func"
+    CLASS = "class"
+    VAR_FUNC_CLASS = "var/func/class"
 
     def __repr__(self) -> str:
         return self.name
@@ -118,7 +117,7 @@ class Analyzer(ast.NodeVisitor):
     def __init__(self, format: Format) -> None:
         self.format = format
         self._out_buffer: list[OutStr] = []
-        self._indent: int = 0
+        self._indent = 0
         self._stack: list[ast.AST] = []
         self._names: dict[str, NameType] = {}
 
@@ -186,7 +185,7 @@ class Analyzer(ast.NodeVisitor):
             self.new_name(name, NameType.VAR_FUNC_CLASS)
 
     def visit_Expr(self, node: ast.Expr) -> None:
-        self.visit(node.value)
+        self.visit_stored(node.value)
 
     def visit_Assign(self, node: ast.Assign) -> None:
         # detect incrementation
@@ -276,9 +275,9 @@ class Analyzer(ast.NodeVisitor):
     def visit_JoinedStr(self, node: ast.JoinedStr) -> None:
         self.append(node, f"l'expansion de {unparsed(node)[1:]}")
 
-    def new_name(self, node: ast.expr, t: NameType) -> None:
+    def new_name(self, node: ast.expr | str, t: NameType) -> None:
         match node:
-            case ast.Name(id):
+            case ast.Name(id) | str(id):
                 self._names[id] = t
             case _:
                 pass
@@ -295,6 +294,8 @@ class Analyzer(ast.NodeVisitor):
                     self.append(node, f'"{value}"')
             case x if x == Ellipsis:
                 self.append(node, "une valeur à définir")
+            case x if x == None:
+                self.append(node, "une valeur vide (None)")
             case _:
                 self.append(node, f"{node.value}")
 
@@ -611,17 +612,17 @@ class Analyzer(ast.NodeVisitor):
                     # lower is given
                     if upper_is_none_or_end:
                         self.append(node, "les éléments de ")
-                        self.visit(node.value)
+                        self.visit(node.value, insert_brace_if_complex=True)
                         self.append(node, " à partir de la position ")
-                        self.visit(lower)
+                        self.visit(lower, insert_brace_if_complex=True)
                     else:
                         # upper is given
                         self.append(node, f"les éléments de ")
-                        self.visit(node.value)
+                        self.visit(node.value, insert_brace_if_complex=True)
                         self.append(node, f" de la position ")
-                        self.visit(lower)
+                        self.visit(lower, insert_brace_if_complex=True)
                         self.append(node, f" à ")
-                        self.visit(upper)
+                        self.visit(upper, insert_brace_if_complex=True)
 
                 if not step_none_or_one:
                     self.append(node, f" avec un élément sur {step}")
@@ -644,7 +645,11 @@ class Analyzer(ast.NodeVisitor):
             self.visit(stmt)
         self.outdent()
         if node.orelse:
-            if len(node.orelse) == 1 and isinstance(node.orelse[0], ast.If):
+            if (
+                len(node.orelse) == 1
+                and isinstance(node.orelse[0], ast.If)
+                and node.orelse[0].col_offset == node.col_offset
+            ):
                 # elif
                 self.append(node.orelse[0], "sinon, ")
                 self.visit(node.orelse[0])
@@ -701,25 +706,37 @@ class Analyzer(ast.NodeVisitor):
                         self.append(node, f" n'est pas un multiple de {value}")
 
             # Boolean checks
-            case ast.Compare(ast.Constant(True), [ast.Eq() | ast.Is()], [expr]) | ast.Compare(expr, [ast.Eq()| ast.Is()], [ast.Constant(True)]):
+            case ast.Compare(ast.Constant(True), [ast.Eq() | ast.Is()], [expr]) | ast.Compare(
+                expr, [ast.Eq() | ast.Is()], [ast.Constant(True)]
+            ):
                 self.visit(expr)
                 self.append(node, " est vrai")
-            case ast.Compare(ast.Constant(False), [ast.Eq() | ast.Is()], [expr]) | ast.Compare(expr, [ast.Eq()| ast.Is()], [ast.Constant(False)]):
+            case ast.Compare(ast.Constant(False), [ast.Eq() | ast.Is()], [expr]) | ast.Compare(
+                expr, [ast.Eq() | ast.Is()], [ast.Constant(False)]
+            ):
                 self.visit(expr)
                 self.append(node, " est faux")
-            case ast.Compare(ast.Constant(True), [ast.NotEq() | ast.IsNot()], [expr]) | ast.Compare(expr, [ast.NotEq()| ast.IsNot()], [ast.Constant(True)]):
+            case ast.Compare(ast.Constant(True), [ast.NotEq() | ast.IsNot()], [expr]) | ast.Compare(
+                expr, [ast.NotEq() | ast.IsNot()], [ast.Constant(True)]
+            ):
                 self.visit(expr)
                 self.append(node, " n'est pas vrai")
-            case ast.Compare(ast.Constant(False), [ast.NotEq() | ast.IsNot()], [expr]) | ast.Compare(expr, [ast.NotEq()| ast.IsNot()], [ast.Constant(False)]):
+            case ast.Compare(ast.Constant(False), [ast.NotEq() | ast.IsNot()], [expr]) | ast.Compare(
+                expr, [ast.NotEq() | ast.IsNot()], [ast.Constant(False)]
+            ):
                 self.visit(expr)
                 self.append(node, " n'est pas faux")
 
             # None checks
-            case ast.Compare(ast.Constant(None), [ast.Eq() | ast.Is()], [expr]) | ast.Compare(expr, [ast.Eq()| ast.Is()], [ast.Constant(None)]):
+            case ast.Compare(ast.Constant(None), [ast.Eq() | ast.Is()], [expr]) | ast.Compare(
+                expr, [ast.Eq() | ast.Is()], [ast.Constant(None)]
+            ):
                 self.visit(expr)
                 self.append(node, " est vide")
 
-            case ast.Compare(ast.Constant(None), [ast.NotEq() | ast.IsNot()], [expr]) | ast.Compare(expr, [ast.NotEq()| ast.IsNot()], [ast.Constant(None)]):
+            case ast.Compare(ast.Constant(None), [ast.NotEq() | ast.IsNot()], [expr]) | ast.Compare(
+                expr, [ast.NotEq() | ast.IsNot()], [ast.Constant(None)]
+            ):
                 self.visit(expr)
                 self.append(node, " n'est pas vide")
 
@@ -837,7 +854,7 @@ def annotate(file: str, format: Format, dump_ast: bool = False) -> None:
     lines = lines[1:]  # skip first empty line
     max_src_width = max(map(len, src_lines)) + 2
     margin_left_width = 1
-    margin_right_width = 4
+    margin_right_width = 3
     margin_left = " " * margin_left_width
     margin_right = " " * margin_right_width
 
