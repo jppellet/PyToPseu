@@ -2,7 +2,7 @@ import { loadPyodide } from 'pyodide'
 
 import { autocompletion } from '@codemirror/autocomplete'
 import { python } from '@codemirror/lang-python'
-import { Prec, Text } from '@codemirror/state'
+import { Prec } from '@codemirror/state'
 import { keymap, lineNumbers } from '@codemirror/view'
 import { EditorView, basicSetup } from 'codemirror'
 
@@ -11,6 +11,14 @@ import { EditorView, basicSetup } from 'codemirror'
 import PyToPseu from '../pytopseu.py'
 
 type InitPyodide = ReturnType<typeof loadPyodide>
+
+// Keep in sync with Python type declaration
+type AnnotationResult = {
+    input_had_preamble: boolean
+    input_continuations: number[]
+    output: string[]
+    output_continuations: number[]
+}
 
 let initPyodide: InitPyodide
 
@@ -46,10 +54,11 @@ async function main() {
                 lastCharToInclude--
             }
             ignoreUpdate = true
+            const newLineText = lineText.substring(0, lastCharToInclude + 1)
             try {
                 editor.dispatch(editor.state.update({
-                    changes: { from: line.from, to: line.to, insert: lineText.substring(0, lastCharToInclude + 1) },
-                    selection: { anchor: line.from + selCol }
+                    changes: { from: line.from, to: line.to, insert: newLineText },
+                    selection: { anchor: line.from + Math.min(selCol, newLineText.length) }
                 }))
             } finally {
                 ignoreUpdate = false
@@ -58,8 +67,11 @@ async function main() {
         changeListenerTimeoutHandle = setTimeout(updateAnnotations, 1000)
     })
 
+    const initialCode = "# Tapez votre code ci-dessous\n"
+
     const editor = new EditorView({
-        doc: "# Tapez votre code ci-dessous",
+        doc: initialCode,
+        selection: { anchor: initialCode.length },
         extensions: [
             basicSetup,
             lineNumbers(),
@@ -68,9 +80,20 @@ async function main() {
             clearLineAndUpdateListener,
             Prec.highest(
                 keymap.of([
-                    { key: "Ctrl-u", mac: "Cmd-u", run: () => { console.log("cmd-u"); updateAnnotations(); return true } },
+                    { key: "Ctrl-u", mac: "Cmd-u", run: () => { updateAnnotations(); return true } },
                 ])
-            )
+            ),
+            EditorView.theme({
+                "&": {
+                    fontSize: "14pt",
+                    lineHeight: "1.5",
+                    border: "2px solid lightgray"
+                },
+                ".cm-content": {
+                    fontFamily: "JetBrains Mono, Menlo, Monaco, Lucida Console, monospace",
+                },
+            }
+            ),
         ],
         parent: document.body,
     })
@@ -78,35 +101,49 @@ async function main() {
     updateAnnotations = async () => {
         // get code from editor
         const userCode = editor.state.doc.toString()
-        console.log("Original:")
-        console.log(userCode)
         try {
             const pyodide = await initPyodide
             await pyodide.runPythonAsync(`__user_code__ = ${JSON.stringify(userCode)}`)
-            let result = await pyodide.runPythonAsync(PyToPseu)
-            if (typeof result === "object" && "toJs" in result) {
-                result = result.toJs()
-                if ("target" in result) {
-                    result = result.target
+            let runResult = await pyodide.runPythonAsync(PyToPseu)
+            if (typeof runResult === "object" && "toJs" in runResult) {
+                runResult = runResult.toJs()
+                if ("target" in runResult) {
+                    runResult = runResult.target
                 }
             }
-            if (typeof result === "string") {
-                console.log("Annotated:")
-                console.log(result)
+            if (typeof runResult === "string") {
+                const annotationResult = JSON.parse(runResult) as AnnotationResult
+                // console.log("Annotated:")
+                // console.log(annotationResult)
 
                 const oldSelPos = editor.state.selection.main.from
                 const oldLine = editor.state.doc.lineAt(oldSelPos)
                 const oldCol = oldSelPos - oldLine.from
-                const oldHаsPreamble = preambleLength(editor.state.doc) !== 0
-                console.log({ oldSelPos, oldLine, oldLineNumber: oldLine.number, oldCol })
+                // console.log({ oldSelPos, oldLine, oldLineNumber: oldLine.number, oldCol })
                 ignoreUpdate = true
                 try {
                     editor.dispatch(editor.state.update({
-                        changes: { from: 0, to: editor.state.doc.length, insert: result },
+                        changes: { from: 0, to: editor.state.doc.length, insert: annotationResult.output.join("\n") },
                     }))
-                    const newLine = editor.state.doc.line(oldLine.number + (oldHаsPreamble ? 0 : 4))
+                    const newLineNumber = oldLine.number + (annotationResult.input_had_preamble ? 0 : 4)
+                    let newLineDelta = 0
+                    for (const continuation of annotationResult.input_continuations) {
+                        if (continuation <= newLineNumber) {
+                            newLineDelta--
+                        } else {
+                            break
+                        }
+                    }
+                    for (const continuation of annotationResult.output_continuations) {
+                        if (continuation <= newLineNumber) {
+                            newLineDelta++
+                        } else {
+                            break
+                        }
+                    }
+                    const newLine = editor.state.doc.line(newLineNumber + newLineDelta)
                     const newSelPos = newLine.from + oldCol
-                    console.log({ newLine, newLineNumber: newLine.number, newSelPos })
+                    // console.log({ newLine, newLineDelta, newLineNumber: newLineNumber, newSelPos })
                     editor.dispatch(editor.state.update({
                         selection: { anchor: newSelPos }
                     }))
@@ -114,18 +151,16 @@ async function main() {
                     ignoreUpdate = false
                 }
             } else {
-                console.log(result)
+                console.log(runResult)
             }
         } catch (e) {
             console.error(e)
         }
     }
 
+
     const editorStyle = editor.dom.style
     editorStyle.height = '100%'
-    editorStyle.fontFamily = "Menlo"
-    editorStyle.fontSize = "16px"
-    editorStyle.lineHeight = "1.5"
 
 
     // const buttons = document.getElementById('buttons')!
@@ -136,14 +171,17 @@ async function main() {
 
     // buttons.appendChild(annotateButton)
     initPyodide = doLoadPyodide()
+
+    // set focus to editor
+    editor.focus()
 }
 
 
-function preambleLength(doc: Text): number {
-    if (doc.lines < 5 || !doc.line(1).text.startsWith('"""') || !doc.line(4).text.startsWith('"""') || !doc.line(3).text.startsWith("---") || !doc.line(2).text.startsWith("Source")) {
-        return 0
-    }
-    return doc.line(5).from
-}
+// function preambleLength(doc: Text): number {
+//     if (doc.lines < 5 || !doc.line(1).text.startsWith('"""') || !doc.line(4).text.startsWith('"""') || !doc.line(3).text.startsWith("---") || !doc.line(2).text.startsWith("Source")) {
+//         return 0
+//     }
+//     return doc.line(5).from
+// }
 
 main()

@@ -1,5 +1,7 @@
 import ast
+import json
 from enum import Enum
+from pprint import pprint
 from typing import NamedTuple
 
 
@@ -110,6 +112,14 @@ class NameType(Enum):
         return self.name
 
 
+# Keep in sync with TypeScript type declaration
+class AnnotationResult(NamedTuple):
+    input_had_preamble: bool
+    input_continuations: list[int]
+    output: list[str]
+    output_continuations: list[int]
+
+
 class Analyzer(ast.NodeVisitor):
     def __init__(self, format: Format) -> None:
         self.format = format
@@ -143,8 +153,8 @@ class Analyzer(ast.NodeVisitor):
             return
         self._stack.append(node)
         is_complex = False
-        if insert_brace_if_complex and is_complex_node(node):
-            self.append(None, "⟨")
+        if insert_brace_if_complex and not is_simple_node(node):
+            self.append(None, "⟨", allow_break=True)
             is_complex = True
         try:
             super().visit(node)
@@ -757,11 +767,11 @@ class Analyzer(ast.NodeVisitor):
                     self.visit(comp)
 
 
-def is_complex_node(node: ast.AST) -> bool:
+def is_simple_node(node: ast.AST) -> bool:
     """
-    Nodes that should be enclosed in ⟨⟩ in a pseudocode subexpression
+    Nodes that should not be enclosed in ⟨⟩ in a pseudocode subexpression
     """
-    return not isinstance(node, (ast.Constant, ast.Name, ast.Subscript))
+    return isinstance(node, (ast.Constant, ast.Name, ast.Subscript))
 
 
 def num_zeros_if_power_of_10(value: int) -> int | None:
@@ -786,44 +796,60 @@ def frenchify(s: str) -> str:
 def annotate_file(file: str, format: Format, dump_ast: bool = False) -> None:
     print(f"Processing '{file}'")
 
-    source = ""
     with open(file, "r", encoding="utf8") as source_file:
         source = source_file.read()
 
     annotated = annotate_code(source, format, dump_ast)
+    if not annotated:
+        print("Syntax error")
+        return
+
     ext = {Format.TEXT: ".txt", Format.MARKDOWN: ".md", Format.PYTHON: "_ann.py"}[format]
     outfile = os.path.splitext(file)[0] + ext
 
     with open(outfile, "w", encoding="utf8") as out_file:
-        out_file.write(annotated)
+        out_file.write("\n".join(annotated.output))
 
     print(f"Output written to '{outfile}'\n")
 
 
-def annotate_code(source: str, format: Format, dump_ast: bool = False) -> str:
+def annotate_code(source: str, format: Format, dump_ast: bool = False) -> AnnotationResult | None:
 
     MAX_LINE_WIDTH = 60
     V_BAR = "│"
     PYTHON_ANN_SEP = "#" + V_BAR
     CONTINUATION_MARK = "└╴"
+    PREAMBLE_LENGTH = 4
+    LEFT_COL_HEADER = "Source"
+    RIGHT_COL_HEADER = "Interprétation"
+
+    input_continuations: list[int] = []
 
     # Strip our own annotations if we find them
-    def strip_ann(line: str) -> str | None:
+    def strip_ann(line: str, number: int) -> str | None:
         if CONTINUATION_MARK in line:
+            input_continuations.append(number)
             return None
         return line.split(PYTHON_ANN_SEP, 1)[0].rstrip()
 
-    src_lines = [line_ for line in source.split("\n") if (line_ := strip_ann(line)) is not None]
+    src_lines = [
+        line_ for n, line in enumerate(source.split("\n"), 1) if (line_ := strip_ann(line, n)) is not None
+    ]
+    input_had_preamble = False
     if (
-        len(src_lines) >= 4
+        len(src_lines) >= PREAMBLE_LENGTH
         and src_lines[0].startswith('"""')
-        and src_lines[3].startswith('"""')
+        and src_lines[PREAMBLE_LENGTH - 1].startswith('"""')
         and src_lines[2].startswith("---")
-        and src_lines[1].startswith("Source")
+        and src_lines[1].startswith(LEFT_COL_HEADER)
     ):
+        input_had_preamble = True
         src_lines = src_lines[4:]
 
-    tree = ast.parse("\n".join(src_lines), type_comments=True)
+    try:
+        tree = ast.parse("\n".join(src_lines), type_comments=True)
+    except SyntaxError as e:
+        return None
 
     if dump_ast:
         print(ast.dump(tree, indent=4))
@@ -834,9 +860,9 @@ def annotate_code(source: str, format: Format, dump_ast: bool = False) -> str:
     if dump_ast:
         analyzer.dump_names()
 
-    num_lines = max(map(lambda x: x.line, analyzer._out_buffer))
-    lines: list[str] = [""] * (num_lines + 1)
+    lines: list[str] = [""] * (len(src_lines) + 1)
     last_line = 0
+    output_continuations: list[int] = []
     line_delta = 0
     for outstr in analyzer._out_buffer:
         if outstr.line == CURRENT_LINE:
@@ -846,9 +872,9 @@ def annotate_code(source: str, format: Format, dump_ast: bool = False) -> str:
         line_width = len(lines[line])
         base_indent = (V_BAR + "   ") * outstr.indent
         if line_width + len(outstr.str) > MAX_LINE_WIDTH and outstr.allow_break:
-
             src_lines.insert(line, "")
             line += 1
+            output_continuations.append(PREAMBLE_LENGTH + line)
             line_delta += 1
             lines.append("")
             indent = f"{base_indent}{V_BAR}     {CONTINUATION_MARK} "
@@ -861,7 +887,7 @@ def annotate_code(source: str, format: Format, dump_ast: bool = False) -> str:
         last_line = line
 
     lines = lines[1:]  # skip first empty line
-    max_src_width = max(map(len, src_lines)) + 2
+    max_src_width = max(len(LEFT_COL_HEADER), max(map(len, src_lines))) + 2
     margin_left_width = 1
     margin_right_width = 3
     margin_left = " " * margin_left_width
@@ -875,21 +901,29 @@ def annotate_code(source: str, format: Format, dump_ast: bool = False) -> str:
     )
 
     sep = PYTHON_ANN_SEP if format == Format.PYTHON else "|"
-    header_sep = "" if format != Format.PYTHON else f"{'"""':{max_src_width}}{margin_left}{sep}\n"
+    header_sep = "" if format != Format.PYTHON else f"{'"""':{max_src_width}}{margin_left}{sep}"
 
-    outs: list[str] = []
+    output_lines: list[str] = []
 
-    outs.append(header_sep)
-    outs.append(f"{"Source":{max_src_width}}{margin_left}{sep}{margin_right}Interprétation\n")
-    outs.append(
-        "-" * (max_src_width + margin_left_width) + sep + "-" * (max_src_width + margin_right_width) + "\n"
+    output_lines.append(header_sep)
+    output_lines.append(
+        f"{LEFT_COL_HEADER:{max_src_width}}{margin_left}{sep}{margin_right}{RIGHT_COL_HEADER}"
     )
-    outs.append(header_sep)
-    for src, pseu in zip(src_lines, lines):
+    output_lines.append(
+        "-" * (max_src_width + margin_left_width) + sep + "-" * (max_src_width + margin_right_width)
+    )
+    output_lines.append(header_sep)
+    last_index = len(src_lines) - 1
+    for i, (src, pseu) in enumerate(zip(src_lines, lines)):
         pseu = frenchify(pseu)
-        outs.append(f"{format_code_line(src):{max_src_width}}{margin_left}{sep}{margin_right}{pseu}\n")
+        code_line = format_code_line(src)
+        if i == last_index and len(code_line.strip()) == 0:
+            # keep last line without annotation if empty, reduces glitches in editor
+            output_lines.append(code_line)
+        else:
+            output_lines.append(f"{code_line:{max_src_width}}{margin_left}{sep}{margin_right}{pseu}")
 
-    return "".join(outs)
+    return AnnotationResult(input_had_preamble, input_continuations, output_lines, output_continuations)
 
 
 def annotate_all(format: Format) -> None:
@@ -897,7 +931,8 @@ def annotate_all(format: Format) -> None:
         if file.endswith(".py") and not file.endswith("_ann.py"):
             annotate_file(os.path.join("sample_src", file), format)
 
-result = None
+
+result_json: str | None = None
 if __name__ == "__main__":
     # check if local var __user_code__ exists
     format = Format.PYTHON
@@ -909,12 +944,18 @@ if __name__ == "__main__":
         if isinstance(code, str):
             ran_user_code = True
             result = annotate_code(code, format)
+            if result:
+                result_json = json.dumps(result._asdict())
+            else:
+                # syntax error
+                pass
 
     if not ran_user_code:
         import os
+
         annotate_all(format)
         # annotate_file("sample_src/lectures_1to5.py", format)
         # annotate_file("sample_src/sample9.py", format)
-        # annotate_file("sample_src/test.py", format, dump_ast=True)
+        # annotate_file("sample_src/tmp.py", format, dump_ast=True)
 
-result
+result_json

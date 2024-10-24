@@ -10,7 +10,8 @@
     "lint-watch": "npm-watch lint",
     "bundle": "./tools/build.js",
     "bundle-watch": "npm-watch bundle",
-    "server": "./tools/local_server.py 8089"
+    "server": "./tools/local_server.py 8089",
+    "deploy": "./tools/deploy-jpp.sh"
   },
   "watch": {
     "bundle": {
