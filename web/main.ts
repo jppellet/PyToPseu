@@ -86,11 +86,13 @@ async function main() {
             EditorView.theme({
                 "&": {
                     fontSize: "14pt",
-                    lineHeight: "1.5",
                     border: "2px solid lightgray"
                 },
                 ".cm-content": {
                     fontFamily: "JetBrains Mono, Menlo, Monaco, Lucida Console, monospace",
+                },
+                ".cm-line, .cm-gutterElement": {
+                    height: "24px",
                 },
             }
             ),

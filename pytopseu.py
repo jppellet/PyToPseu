@@ -300,7 +300,7 @@ class Analyzer(ast.NodeVisitor):
                 else:
                     self.append(node, f'"{value}"')
             case x if x == Ellipsis:
-                self.append(node, "une valeur à définir")
+                self.append(node, "quelque chose à définir")
             case x if x == None:
                 self.append(node, "une valeur vide (None)")
             case _:
@@ -820,7 +820,7 @@ def annotate_code(source: str, format: Format, dump_ast: bool = False) -> Annota
     PYTHON_ANN_SEP = "#" + V_BAR
     CONTINUATION_MARK = "└╴"
     PREAMBLE_LENGTH = 4
-    LEFT_COL_HEADER = "Source"
+    LEFT_COL_HEADER = "Code"
     RIGHT_COL_HEADER = "Interprétation"
 
     input_continuations: list[int] = []
@@ -840,7 +840,7 @@ def annotate_code(source: str, format: Format, dump_ast: bool = False) -> Annota
         len(src_lines) >= PREAMBLE_LENGTH
         and src_lines[0].startswith('"""')
         and src_lines[PREAMBLE_LENGTH - 1].startswith('"""')
-        and src_lines[2].startswith("---")
+        and src_lines[2].startswith("———")
         and src_lines[1].startswith(LEFT_COL_HEADER)
     ):
         input_had_preamble = True
@@ -905,12 +905,12 @@ def annotate_code(source: str, format: Format, dump_ast: bool = False) -> Annota
 
     output_lines: list[str] = []
 
-    output_lines.append(header_sep)
+    output_lines.append('"""')
     output_lines.append(
-        f"{LEFT_COL_HEADER:{max_src_width}}{margin_left}{sep}{margin_right}{RIGHT_COL_HEADER}"
+        f"{LEFT_COL_HEADER:{max_src_width+1}}{margin_left}{sep[-1]}{margin_right}{RIGHT_COL_HEADER}"
     )
     output_lines.append(
-        "-" * (max_src_width + margin_left_width) + sep + "-" * (max_src_width + margin_right_width)
+        "—" * (max_src_width + max_src_width + margin_left_width + margin_right_width + len(sep))
     )
     output_lines.append(header_sep)
     last_index = len(src_lines) - 1
