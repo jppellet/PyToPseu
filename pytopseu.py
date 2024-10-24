@@ -1,8 +1,5 @@
 import ast
-import os
-from enum import Enum, auto
-from os import path
-from pprint import pprint
+from enum import Enum
 from typing import NamedTuple
 
 
@@ -786,17 +783,29 @@ def frenchify(s: str) -> str:
     )
 
 
-def annotate(file: str, format: Format, dump_ast: bool = False) -> None:
+def annotate_file(file: str, format: Format, dump_ast: bool = False) -> None:
     print(f"Processing '{file}'")
+
+    source = ""
+    with open(file, "r", encoding="utf8") as source_file:
+        source = source_file.read()
+
+    annotated = annotate_code(source, format, dump_ast)
+    ext = {Format.TEXT: ".txt", Format.MARKDOWN: ".md", Format.PYTHON: "_ann.py"}[format]
+    outfile = os.path.splitext(file)[0] + ext
+
+    with open(outfile, "w", encoding="utf8") as out_file:
+        out_file.write(annotated)
+
+    print(f"Output written to '{outfile}'\n")
+
+
+def annotate_code(source: str, format: Format, dump_ast: bool = False) -> str:
 
     MAX_LINE_WIDTH = 60
     V_BAR = "│"
     PYTHON_ANN_SEP = "#" + V_BAR
     CONTINUATION_MARK = "└╴"
-
-    source = ""
-    with open(file, "r", encoding="utf8") as source_file:
-        source = source_file.read()
 
     # Strip our own annotations if we find them
     def strip_ann(line: str) -> str | None:
@@ -865,36 +874,47 @@ def annotate(file: str, format: Format, dump_ast: bool = False) -> None:
         else lambda src: src
     )
 
-    ext = {Format.TEXT: ".txt", Format.MARKDOWN: ".md", Format.PYTHON: "_ann.py"}[format]
-    outfile = path.splitext(file)[0] + ext
     sep = PYTHON_ANN_SEP if format == Format.PYTHON else "|"
     header_sep = "" if format != Format.PYTHON else f"{'"""':{max_src_width}}{margin_left}{sep}\n"
-    with open(outfile, "w", encoding="utf8") as out_file:
-        out_file.write(header_sep)
-        out_file.write(f"{"Source":{max_src_width}}{margin_left}{sep}{margin_right}Pseudocode\n")
-        out_file.write(
-            "-" * (max_src_width + margin_left_width)
-            + sep
-            + "-" * (max_src_width + margin_right_width)
-            + "\n"
-        )
-        out_file.write(header_sep)
-        for src, pseu in zip(src_lines, lines):
-            pseu = frenchify(pseu)
-            out_file.write(f"{format_code_line(src):{max_src_width}}{margin_left}{sep}{margin_right}{pseu}\n")
 
-    print(f"Output written to '{outfile}'\n")
+    outs: list[str] = []
+
+    outs.append(header_sep)
+    outs.append(f"{"Source":{max_src_width}}{margin_left}{sep}{margin_right}Interprétation\n")
+    outs.append(
+        "-" * (max_src_width + margin_left_width) + sep + "-" * (max_src_width + margin_right_width) + "\n"
+    )
+    outs.append(header_sep)
+    for src, pseu in zip(src_lines, lines):
+        pseu = frenchify(pseu)
+        outs.append(f"{format_code_line(src):{max_src_width}}{margin_left}{sep}{margin_right}{pseu}\n")
+
+    return "".join(outs)
 
 
 def annotate_all(format: Format) -> None:
     for file in sorted(os.listdir("sample_src")):
         if file.endswith(".py") and not file.endswith("_ann.py"):
-            annotate(path.join("sample_src", file), format)
+            annotate_file(os.path.join("sample_src", file), format)
 
-
+result = None
 if __name__ == "__main__":
+    # check if local var __user_code__ exists
     format = Format.PYTHON
-    annotate_all(format)
-    # annotate("sample_src/lectures_1to5.py", format)
-    # annotate("sample_src/sample9.py", format)
-    # annotate("sample_src/test.py", format, dump_ast=True)
+
+    local_vars = locals()
+    ran_user_code = False
+    if "__user_code__" in local_vars:
+        code = local_vars["__user_code__"]
+        if isinstance(code, str):
+            ran_user_code = True
+            result = annotate_code(code, format)
+
+    if not ran_user_code:
+        import os
+        annotate_all(format)
+        # annotate_file("sample_src/lectures_1to5.py", format)
+        # annotate_file("sample_src/sample9.py", format)
+        # annotate_file("sample_src/test.py", format, dump_ast=True)
+
+result
