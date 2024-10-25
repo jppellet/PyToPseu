@@ -14,6 +14,7 @@ class Format(Enum):
 # See https://docs.python.org/3/library/ast.html#module-ast
 
 CURRENT_LINE = -1
+ASTERISKS = ["*", "†", "‡", "§", "‖", "¶", "Δ", "◊"]
 
 T = TypeVar("T")
 
@@ -154,6 +155,29 @@ class Analyzer(ast.NodeVisitor):
     ) -> None:
         line = CURRENT_LINE if node is None else node.lineno
         self._out_buffer.append(OutStr(line + linedelta, self._indent, str, allow_break))
+
+    A = TypeVar("A", bound=ast.expr | ast.stmt | ast.arg)
+
+    def sep_join(self, items: Iterable[A], sep: str = ", ", last_sep: str = " et ") -> Iterable[A]:
+        """
+        Join items with separators, like "a, b et c"
+        """
+        it = iter(items)
+        try:
+            prev = next(it)
+        except StopIteration:
+            return
+        yield prev
+        try:
+            prev = next(it)
+        except StopIteration:
+            return
+        for current in it:
+            self.append(prev, sep)
+            yield prev
+            prev = current
+        self.append(prev, last_sep)
+        yield prev
 
     def dump_names(self) -> None:
         names: dict[NameType, list[str]] = {t: [] for t in NameType}
@@ -538,11 +562,23 @@ class Analyzer(ast.NodeVisitor):
     def visit_Name(self, node: ast.Name) -> None:
         self.append(node, var(node.id))
 
+    def visit_List(self, node: ast.List) -> None:
+        num_elems = len(node.elts)
+        if num_elems == 0:
+            self.append(node, "une liste vide")
+        elif num_elems == 1:
+            self.append(node, "une liste avec un seul élément, ")
+            self.visit(node.elts[0])
+        else:
+            self.append(node, f"une liste avec {num_elems} éléments: ")
+            for elem in self.sep_join(node.elts):
+                self.visit(elem)
+
     def visit_Pass(self, node: ast.Pass) -> None:
         self.append(node, "ne fais rien de spécial")
 
     def visit_Break(self, node: ast.Break) -> None:
-        self.append(node, "sors de la boucle")
+        self.append(node, "interromps la boucle")
 
     def visit_Continue(self, node: ast.Continue) -> None:
         self.append(node, "passe à l'itération suivante")
@@ -553,6 +589,40 @@ class Analyzer(ast.NodeVisitor):
         else:
             self.append(node, "sors de la fonction en renvoyant ")
             self.visit(node.value)
+
+    def visit_Yield(self, node: ast.Yield) -> None:
+        if node.value is None:
+            self.append(node, "génère une valeur vide")
+        else:
+            self.append(node, "génère ")
+            self.visit(node.value)
+
+    def visit_Try(self, node: ast.Try) -> None:
+        self.append(node, "essaie ceci:")
+        self.indent()
+        for stmt in node.body:
+            self.visit(stmt)
+        self.outdent()
+        if node.handlers:
+            for handler in node.handlers:
+                self.append(handler.body[0], "en cas d'erreur:", linedelta=-1)
+                # TODO: de type blabla
+                self.indent()
+                for stmt in handler.body:
+                    self.visit(stmt)
+                self.outdent()
+        if node.finalbody:
+            self.append(node.finalbody[0], "dans tous les cas, finis par:", linedelta=-1)
+            self.indent()
+            for stmt in node.finalbody:
+                self.visit(stmt)
+            self.outdent()
+        if node.orelse:
+            self.append(node, "s'il n'y a pas eu d'erreur:", linedelta=-1)
+            self.indent()
+            for stmt in node.orelse:
+                self.visit(stmt)
+            self.outdent()
 
     def visit_Await(self, node: ast.Await) -> None:
         self.append(node, "attends ")
@@ -683,6 +753,12 @@ class Analyzer(ast.NodeVisitor):
         for stmt in node.body:
             self.visit(stmt)
         self.outdent()
+        if node.orelse:
+            self.append(node.orelse[0], "si la boucle n'a pas été interrompue:", linedelta=-1)
+            self.indent()
+            for stmt in node.orelse:
+                self.visit(stmt)
+            self.outdent()
 
     def visit_While(self, node: ast.While) -> None:
         match node.test:
@@ -921,6 +997,7 @@ def annotate_code(source: str, format: Format, dump_ast: bool = False) -> Annota
     PYTHON_ANN_SEP = "#" + V_BAR
     CONTINUATION_MARK = "└╴"
     PREAMBLE_LENGTH = 4
+    MIN_CODE_WIDTH = 25
     LEFT_COL_HEADER = "Code"
     RIGHT_COL_HEADER = "Interprétation"
 
@@ -988,7 +1065,7 @@ def annotate_code(source: str, format: Format, dump_ast: bool = False) -> Annota
         last_line = line
 
     lines = lines[1:]  # skip first empty line
-    max_src_width = max(len(LEFT_COL_HEADER), max(map(len, src_lines))) + 2
+    max_src_width = max(MIN_CODE_WIDTH, max(map(len, src_lines))) + 2
     margin_left_width = 1
     margin_right_width = 3
     margin_left = " " * margin_left_width
