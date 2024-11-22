@@ -6,6 +6,8 @@ import { Prec } from '@codemirror/state'
 import { keymap, lineNumbers } from '@codemirror/view'
 import { EditorView, basicSetup } from 'codemirror'
 
+import * as LZString from "lz-string"
+
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import PyToPseu from '../pytopseu.py'
@@ -22,12 +24,16 @@ type AnnotationResult = {
 
 let initPyodide: InitPyodide
 
+const BASE_EXTERNAL_PACKAGES = ['typing-extensions']
+
 async function main() {
     const doLoadPyodide = (globalThis as any).loadPyodide as typeof loadPyodide
 
     let changeListenerTimeoutHandle: number | undefined = undefined
 
     let updateAnnotations: () => Promise<void>
+    let saveToURL: () => Promise<void>
+
     let ignoreUpdate = false
 
     const clearLineAndUpdateListener = EditorView.updateListener.of((update) => {
@@ -81,6 +87,7 @@ async function main() {
             Prec.highest(
                 keymap.of([
                     { key: "Ctrl-u", mac: "Cmd-u", run: () => { updateAnnotations(); return true } },
+                    { key: "Ctrl-s", mac: "Cmd-s", run: () => { saveToURL(); return true } },
                 ])
             ),
             EditorView.theme({
@@ -100,9 +107,7 @@ async function main() {
         parent: document.body,
     })
 
-    updateAnnotations = async () => {
-        // get code from editor
-        const userCode = editor.state.doc.toString()
+    async function updateAnnotationsFor(userCode: string) {
         try {
             const pyodide = await initPyodide
             await pyodide.runPythonAsync(`__user_code__ = ${JSON.stringify(userCode)}`)
@@ -160,6 +165,18 @@ async function main() {
         }
     }
 
+    updateAnnotations = async () => {
+        return updateAnnotationsFor(editor.state.doc.toString())
+    }
+
+    saveToURL = async () => {
+        const userCode = editor.state.doc.toString()
+        const compressed = LZString.compressToEncodedURIComponent(userCode)
+        const url = new URL(window.location.href)
+        url.searchParams.set('t', compressed)
+        window.history.replaceState({}, '', url.toString())
+    }
+
 
     const editorStyle = editor.dom.style
     editorStyle.height = '100%'
@@ -172,7 +189,30 @@ async function main() {
     // annotateButton.onclick = updateAnnotations
 
     // buttons.appendChild(annotateButton)
-    initPyodide = doLoadPyodide()
+
+    // load pyodide and external packages
+    initPyodide = doLoadPyodide().then((pyodide) => {
+        return pyodide.loadPackage(BASE_EXTERNAL_PACKAGES).then(() => {
+            return pyodide
+        })
+    })
+
+    // check if there is code to preload the editor with in the URL
+    initPyodide.then(() => {
+        const url = new URL(window.location.href)
+        const compressedCode = url.searchParams.get('t')
+        if (compressedCode) {
+            const code = LZString.decompressFromEncodedURIComponent(compressedCode)
+            if (code) {
+                updateAnnotationsFor(code).then(() => {
+                    // move cursor to end
+                    editor.dispatch(editor.state.update({
+                        selection: { anchor: editor.state.doc.length }
+                    }))
+                })
+            }
+        }
+    })
 
     // set focus to editor
     editor.focus()
