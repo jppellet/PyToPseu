@@ -1,8 +1,11 @@
 import ast
 import json
 from enum import Enum
-from pprint import pprint
-from typing import Iterable, NamedTuple, TypeVar
+from pprint import pformat, pprint
+from types import EllipsisType, NoneType
+from typing import Callable, Iterable, NamedTuple, Type, TypeVar
+
+from typing_extensions import TypeIs
 
 
 class Format(Enum):
@@ -19,6 +22,66 @@ ASTERISKS = ["*", "†", "‡", "§", "‖", "¶", "Δ", "◊"]
 T = TypeVar("T")
 
 
+def try_infer_type_of(expr: ast.expr) -> type | None:
+    match expr:
+        case ast.Constant(value):
+            match value:
+                case str():
+                    return str
+                case int():
+                    return int
+                case float():
+                    return float
+                case bool():
+                    return bool
+                case bytes():
+                    return bytes
+                case complex():
+                    return complex
+                case x if x == Ellipsis:
+                    return EllipsisType
+                case x if x == None:
+                    return NoneType
+                case _:
+                    unhandled(f"constant value: {value}")
+                    return None
+        case ast.List() | ast.ListComp():
+            return list
+        case ast.Set() | ast.SetComp():
+            return set
+        case ast.Dict() | ast.DictComp():
+            return dict
+        case ast.Tuple():
+            return tuple
+        case ast.FormattedValue() | ast.JoinedStr():
+            return str
+        case ast.BoolOp() | ast.Compare():
+            return bool  # really? could be other things
+        case _:
+            unhandled(f"expression: {type(expr).__name__}")
+            return None
+
+        # TO HANDLE:
+        #  | NamedExpr(expr target, expr value)
+        #  | BinOp(expr left, operator op, expr right)
+        #  | UnaryOp(unaryop op, expr operand)
+        #  | Lambda(arguments args, expr body)
+        #  | IfExp(expr test, expr body, expr orelse)
+        #  | GeneratorExp(expr elt, comprehension* generators)
+        #  -- the grammar constrains where yield expressions can occur
+        #  | Await(expr value)
+        #  | Yield(expr? value)
+        #  | YieldFrom(expr value)
+        #  | Call(expr func, expr* args, keyword* keywords)
+        #  -- the following expression can appear in assignment context
+        #  | Attribute(expr value, identifier attr, expr_context ctx)
+        #  | Subscript(expr value, expr slice, expr_context ctx)
+        #  | Starred(expr value, expr_context ctx)
+        #  | Name(identifier id, expr_context ctx)
+        #  -- can appear only in Subscript
+        #  | Slice(expr? lower, expr? upper, expr? step)
+
+
 def track_last(iterable: Iterable[T]) -> Iterable[tuple[T, bool]]:
     it = iter(iterable)
     prev = next(it)
@@ -32,19 +95,67 @@ def unparsed(expr: ast.AST) -> str:
     return ast.unparse(expr)
 
 
-def readable_type(expr: ast.expr) -> str:
-    s = ast.unparse(expr)
-    match s:
-        case "int":
-            return "un nombre entier"
-        case "float":
-            return "un nombre à virgule"
-        case "str":
-            return "une chaîne de caractères"
-        case "bool":
-            return "une valeur vrai/faux"
-        case _:
-            return s
+def readable_type(expr: ast.expr, plural: bool = False) -> str:
+
+    def helper(expr: ast.expr, plural: bool) -> tuple[str, Type | None]:
+
+        # normalize attribute access so that e.g. typing.List becomes just List
+        match expr:
+            case ast.Attribute(_, attr):
+                expr = ast.Name(attr)
+
+        match expr:
+            # simple types
+            case ast.Name(simpletype):
+                match simpletype:
+                    case "int":
+                        return "un nombre entier" if not plural else "nombres entiers", int
+                    case "float":
+                        return "un nombre à virgule" if not plural else "nombres à virgule", float
+                    case "str":
+                        return "une chaîne de caractères" if not plural else "chaînes de caractères", str
+                    case "bool":
+                        return "une valeur vrai/faux" if not plural else "valeurs vrai/faux", bool
+                    case "list" | "List":
+                        return "une liste" if not plural else "listes", list
+                    case "set" | "Set":
+                        return "un ensemble" if not plural else "ensembles", set
+                    case "dict" | "Dict" | "defaultdict":
+                        return "un dictionnaire" if not plural else "dictionnaires", dict
+                    case "tuple" | "Tuple":
+                        return f"un tuple" if not plural else "tuples", tuple
+                    case _:
+                        return simpletype, None
+
+            # parametrized types
+            case ast.Subscript(paramtype, typeparams):
+                basedesc, basetype = helper(paramtype, plural)
+                if basetype is list or basetype is set:
+                    return f"{basedesc} de {readable_type(typeparams, plural=True)}", basetype
+                if basetype is dict:
+                    match typeparams:
+                        case ast.Tuple([keytype, valuetype]):
+                            return (
+                                f"{basedesc} reliant des {readable_type(keytype, plural=True)} à des {readable_type(valuetype, plural=True)}",
+                                basetype,
+                            )
+                        case _:
+                            return basedesc + " d’éléments mal définis", basetype
+                if basetype is tuple:
+                    return f"{basedesc} avec {readable_type(typeparams, plural=True)}", basetype
+
+                return f"{basedesc} de {readable_type(typeparams, plural=True)}", basetype
+
+            # multiple type parameters
+            case ast.Tuple(elts):
+                return ", ".join(readable_type(e, plural) for e in elts), None  # not tuple
+
+        # all the rest
+        unparsed = ast.unparse(expr)
+        unhandled(f"type with AST of class {type(expr).__name__}, {unparsed}")
+        return unparsed, None
+
+    return helper(expr, plural)[0]
 
 
 HAS_LOWER_UNDERLINE = "gjpqy"
@@ -113,15 +224,40 @@ class OutStr(NamedTuple):
     allow_break: bool
 
 
-class NameType(Enum):
-    MODULE = "mod"
-    VAR = "var"
-    FUNC = "func"
-    CLASS = "class"
-    VAR_FUNC_CLASS = "var/func/class"
+class Module(NamedTuple):
+    pass
 
-    def __repr__(self) -> str:
-        return self.name
+
+class Var(NamedTuple):
+    type: ast.expr | None
+
+
+class Func(NamedTuple):
+    # args: list[ast.arg]
+    # returns: ast.expr | None
+    pass
+
+
+class Class(NamedTuple):
+    pass
+
+
+class VarFuncClass(NamedTuple):
+    pass
+
+
+NameInfo = Module | Var | Func | Class | VarFuncClass
+
+
+def name_matches[
+    T: NameInfo
+](obj: NameInfo, cls: Type[T], pred: Callable[[T], bool] | None = None) -> TypeIs[T]:
+    return isinstance(obj, cls) and (pred is None or pred(obj))
+
+
+a: NameInfo = Module()
+if name_matches(a, Var, lambda v: v.type is not None):
+    print(a)
 
 
 # Keep in sync with TypeScript type declaration
@@ -138,7 +274,7 @@ class Analyzer(ast.NodeVisitor):
         self._out_buffer: list[OutStr] = []
         self._indent = 0
         self._stack: list[ast.AST] = []
-        self._names: dict[str, NameType] = {}
+        self._names: dict[str, NameInfo] = {}
 
     def indent(self) -> None:
         self._indent += 1
@@ -180,12 +316,8 @@ class Analyzer(ast.NodeVisitor):
         yield prev
 
     def dump_names(self) -> None:
-        names: dict[NameType, list[str]] = {t: [] for t in NameType}
         for name, t in self._names.items():
-            names[t].append(name)
-        for t, ns in names.items():
-            if ns:
-                print(f"{repr(t)}: {', '.join(ns)}")
+            print(f"{name}: {t}")
 
     def visit(self, node: ast.AST | None, insert_brace_if_complex=False) -> None:
         if node is None:
@@ -216,7 +348,7 @@ class Analyzer(ast.NodeVisitor):
         self.append(node, f"on va utiliser {what} {', '.join(imports)}")
         for alias in node.names:
             name = alias.asname or alias.name
-            self.new_name(name, NameType.MODULE)
+            self.new_name(name, Module())
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         module = node.module
@@ -228,7 +360,7 @@ class Analyzer(ast.NodeVisitor):
         self.append(node, f"on va utiliser {what} {', '.join(imports)} du module {var(module or '')}")
         for alias in node.names:
             name = alias.asname or alias.name
-            self.new_name(name, NameType.VAR_FUNC_CLASS)
+            self.new_name(name, VarFuncClass())
 
     def visit_Expr(self, node: ast.Expr) -> None:
         # ast.Expr is an expr as a statement
@@ -265,7 +397,7 @@ class Analyzer(ast.NodeVisitor):
             unhandled("multiple assignment")
 
         for varname in node.targets:
-            self.new_name(varname, NameType.VAR)
+            self.new_name(varname, Var(type=None))
 
     def visit_stored(self, node: ast.expr) -> None:
         match node:
@@ -287,7 +419,7 @@ class Analyzer(ast.NodeVisitor):
             )
             self.append(node, f" stocke ", allow_break=True)
             self.visit_stored(node.value)
-        self.new_name(node.target, NameType.VAR)
+        self.new_name(node.target, Var(type=node.annotation))
 
     def visit_AugAssign(self, node: ast.AugAssign) -> None:
         ident = unparsed(node.target)
@@ -317,20 +449,25 @@ class Analyzer(ast.NodeVisitor):
             case _:
                 self.append(node, f"dans {var(ident)}, stocke le résultat de {var(ident)} {node.op} ")
                 self.visit_stored(node.value)
-        self.new_name(node.target, NameType.VAR)
+        self.new_name(node.target, Var(type=None))
 
     def visit_JoinedStr(self, node: ast.JoinedStr) -> None:
         self.append(node, f"l'expansion de {unparsed(node)[1:]}")
 
-    def new_name(self, node: ast.expr | str, t: NameType) -> None:
+    def new_name(self, node: ast.expr | str, t: NameInfo) -> None:
         match node:
             case ast.Name(id) | str(id):
-                self._names[id] = t
+                old = self._names.get(id)
+                if old is not None and (isinstance(old, Var) and old.type is not None):
+                    # we have better information from before, so we skip the update
+                    pass
+                else:
+                    self._names[id] = t
             case _:
                 pass
 
-    def name_is(self, name: str, t: NameType) -> bool:
-        return self._names.get(name) == t
+    # def name_is(self, name: str, t: _ClassInfo) -> bool:
+    #     return self._names.get(name) == t
 
     def visit_Constant(self, node: ast.Constant) -> None:
         match node.value:
@@ -478,6 +615,30 @@ class Analyzer(ast.NodeVisitor):
             case "len":
                 self.append(node, "la longueur de ")
                 self.visit(args[0])
+            case "list":
+                if len(args) == 0:
+                    self.append(node, "une liste vide")
+                else:
+                    self.append(node, "la conversion en liste de ")
+                    self.visit(args[0])
+            case "set":
+                if len(args) == 0:
+                    self.append(node, "un ensemble vide")
+                else:
+                    self.append(node, "la conversion en ensemble de ")
+                    self.visit(args[0])
+            case "tuple":
+                if len(args) == 0:
+                    self.append(node, "un tuple vide")
+                else:
+                    self.append(node, "la conversion en tuple de ")
+                    self.visit(args[0])
+            case "dict":
+                if len(args) == 0:
+                    self.append(node, "un dictionnaire vide")
+                else:
+                    self.append(node, "la conversion en dictionnaire de ")
+                    self.visit(args[0])
             case "range":
                 numargs = len(args)
                 if numargs == 0:
@@ -504,7 +665,7 @@ class Analyzer(ast.NodeVisitor):
 
             case _:
 
-                def append_args(first_prefix: str = "avec ") -> None:
+                def append_args(first_prefix: str = "") -> None:
                     for i, arg in enumerate(args):
                         if i > 0:
                             self.append(node, ", ")
@@ -519,14 +680,16 @@ class Analyzer(ast.NodeVisitor):
                             self.visit(expr, insert_brace_if_complex=True)
 
                         match method:
+
+                            # string methods
                             case "startswith":
                                 append_expr()
                                 self.append(node, f" commence par ")
-                                append_args(first_prefix="")
+                                append_args()
                             case "endswith":
                                 append_expr()
                                 self.append(node, f" finit par ")
-                                append_args(first_prefix="")
+                                append_args()
                             case "upper":
                                 self.append(node, f"une copie tout en majuscules de ")
                                 append_expr()
@@ -551,28 +714,161 @@ class Analyzer(ast.NodeVisitor):
                             case "rstrip":
                                 self.append(node, f"une copie sans espaces de fin de ")
                                 append_expr()
+
+                            # list methods
+                            case "append":
+                                self.append(node, f"à la fin de ")
+                                append_expr()
+                                self.append(node, f", ajoute ")
+                                append_args()
+                            case "extend":
+                                self.append(node, f"à la fin de ")
+                                append_expr()
+                                is_literal = len(args) == 1 and (
+                                    isinstance(args[0], ast.List) or isinstance(args[0], ast.Tuple)
+                                )
+                                if is_literal:
+                                    self.append(node, f", ajoute les éléments ")
+                                    for arg in self.sep_join(args[0].elts):
+                                        self.visit(arg)
+                                else:
+                                    self.append(node, f", ajoute tous les éléments de ")
+                                    append_args()
+                            case "insert":
+                                if len(args) == 2:
+                                    self.append(node, f"à la position ")
+                                    self.visit(args[0])
+                                    self.append(node, f" de ")
+                                    append_expr()
+                                    self.append(node, f", insère ")
+                                    self.visit(args[1])
+                                else:
+                                    self.append(node, "dans ")
+                                    append_expr()
+                                    self.append(node, f", insère quelque chose de mal défini")
+                            case "remove" | "discard":
+                                # discard is different from remove, because it is only for sets and won't raise an error if the specified item does not exist, but remove will
+                                self.append(node, f"de ")
+                                append_expr()
+                                self.append(node, f", retire ")
+                                append_args()
+                            case "pop":
+                                self.append(node, f"de ")
+                                append_expr()
+                                if len(args) == 0:
+                                    self.append(node, f", retire le dernier élément")
+                                else:
+                                    self.append(node, f", retire l'élément à la position ")
+                                    self.visit(args[0])
+                            case "clear":
+                                self.append(node, f"supprime tous les éléments de ")
+                                append_expr()
+                            case "index":
+                                numargs = len(args)
+                                self.append(node, f"la position dans ")
+                                append_expr()
+                                if numargs == 0:
+                                    self.append(node, f" d’un élément mal défini")
+                                else:
+                                    self.append(node, f" de ")
+                                    self.visit(args[0])
+                                    if numargs == 2:
+                                        self.append(node, f" (à partir de la position ")
+                                        self.visit(args[1])
+                                        self.append(node, f")")
+                                    elif numargs == 3:
+                                        self.append(node, f" (entre la position ")
+                                        self.visit(args[1])
+                                        self.append(node, f" et la position ")
+                                        self.visit(args[2])
+                                        self.append(node, f")")
+
+                            case "count":
+                                self.append(node, f"le nombre d’occurrences dans ")
+                                append_expr()
+                                self.append(node, f" de ")
+                                append_args()
+                            case "sort":
+                                self.append(node, f"trie ")
+                                append_expr()
+                                # TODO key= and reverse= argument parsing
+                            case "reverse":
+                                self.append(node, f"inverse l’ordre des éléments de ")
+                                append_expr()
+                            case "copy":
+                                self.append(node, f"une copie de ")
+                                append_expr()
+
+                            # additional set methods
+                            case "add":
+                                self.append(node, f"dans ")
+                                append_expr()
+                                self.append(node, f", inclus ")
+                                append_args()
+                            # TODO there are others, like difference, intersection, isdisjoint, issubset, issuperset, symmetric_difference, union, etc.: https://www.w3schools.com/python/python_ref_set.asp
+
+                            # generic methods
                             case _:
                                 self.append(node, f"le résultat de la méthode {var(method)} de ")
                                 append_expr()
-                                append_args()
+                                append_args(first_prefix=" avec ")
                     case _:
-                        self.append(node, f"le résultat de la fonction {funcname} ")
-                        append_args()
+                        # TODO find if we are in an expression or a statement
+                        is_statement = False
+                        if is_statement:
+                            self.append(node, f"appelle la fonction {funcname}")
+                            append_args(first_prefix=" avec ")
+                        else:
+                            self.append(node, f"le résultat de la fonction {funcname}")
+                            append_args(first_prefix=" avec ")
 
     def visit_Name(self, node: ast.Name) -> None:
         self.append(node, var(node.id))
 
-    def visit_List(self, node: ast.List) -> None:
+    def visit_collection(self, node: ast.List | ast.Set | ast.Tuple, name: str) -> None:
         num_elems = len(node.elts)
         if num_elems == 0:
-            self.append(node, "une liste vide")
+            self.append(node, f"{name} vide")
         elif num_elems == 1:
-            self.append(node, "une liste avec un seul élément, ")
+            self.append(node, f"{name} avec un seul élément, ")
             self.visit(node.elts[0])
         else:
-            self.append(node, f"une liste avec {num_elems} éléments: ")
+            self.append(node, f"{name} avec les éléments ")
             for elem in self.sep_join(node.elts):
-                self.visit(elem)
+                self.visit(elem, insert_brace_if_complex=True)
+
+    def visit_List(self, node: ast.List) -> None:
+        self.visit_collection(node, "une liste")
+
+    def visit_Set(self, node: ast.Set) -> None:
+        self.visit_collection(node, "un ensemble")
+
+    def visit_Tuple(self, node: ast.Tuple) -> None:
+        self.visit_collection(node, "un tuple")
+
+    def visit_Dict(self, node: ast.Dict) -> None:
+        num_elems = len(node.keys)
+        if num_elems == 0:
+            self.append(node, "un dictionnaire vide")
+        elif num_elems == 1:
+            self.append(node, "un dictionnaire reliant ")
+            self.visit(node.keys[0])
+            self.append(node, " à ")
+            self.visit(node.values[0])
+        else:
+            self.append(node, "un dictionnaire reliant: ")
+            for key, value in self.sep_join(zip(node.keys, node.values)):
+                self.visit(key, allow_break=True)
+                self.append(key, " à ")
+                self.visit(value)
+
+    def visit_Starred(self, node: ast.Starred) -> None:
+        match node.value:
+            case ast.Subscript():
+                self.visit(node.value)
+            case _:
+                self.append(node, "les éléments de ")
+                self.visit(node.value)
 
     def visit_Pass(self, node: ast.Pass) -> None:
         self.append(node, "ne fais rien de spécial")
@@ -631,7 +927,7 @@ class Analyzer(ast.NodeVisitor):
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         self.append(node, f"définis la fonction {var(node.name)}, ")
         for arg in node.args.args:
-            self.new_name(arg.arg, NameType.VAR)
+            self.new_name(arg.arg, Var(type=arg.annotation))
         num_args = len(node.args.args)
         needs_and = num_args > 0
 
@@ -645,17 +941,14 @@ class Analyzer(ast.NodeVisitor):
         if num_args == 0:
             self.append(node, "sans argument, ")
         elif num_args == 1:
-            self.append(node, f"qui prend un argument, {var(node.args.args[0].arg)}, ")
+            self.append(node, f"qui prend un argument, ")
+            append_arg(arg)
+            self.append(node, ", ")
         else:
-            self.append(node, f"qui prend {num_args} arguments")
-            for arg, is_last in track_last(node.args.args):
-                if not is_last:
-                    self.append(node, ", ")
-                    append_arg(arg)
-                else:
-                    self.append(node, " et ")
-                    append_arg(arg)
-                    self.append(node, ", ")
+            self.append(node, f"qui prend {num_args} arguments, ")
+            for arg in self.sep_join(node.args.args):
+                append_arg(arg)
+            self.append(node, ", ")
         if node.returns:
             if needs_and:
                 self.append(node, "et ")
@@ -672,10 +965,9 @@ class Analyzer(ast.NodeVisitor):
         self.outdent()
 
     def visit_Lambda(self, node: ast.Lambda) -> None:
-
         self.append(node, "une fonction anonyme")
         for arg in node.args.args:
-            self.new_name(arg.arg, NameType.VAR)
+            self.new_name(arg.arg, Var(type=arg.annotation))
         num_args = len(node.args.args)
         if num_args == 0:
             self.append(node, " sans argument")
@@ -963,10 +1255,11 @@ def num_zeros_if_power_of_10(value: int) -> int | None:
 
 def frenchify(s: str) -> str:
     return (
-        s.replace(" de les ", " des ")
-        .replace(" de le ", " du ")
-        .replace(" à le ", " au ")
+        s.replace(" à le ", " au ")
         .replace(" à les ", " aux ")
+        .replace(" de les ", " des ")
+        .replace(" de le ", " du ")
+        .replace(" de e", " d’e")
     )
 
 
@@ -1095,7 +1388,7 @@ def annotate_code(source: str, format: Format, dump_ast: bool = False) -> Annota
     for i, (src, pseu) in enumerate(zip(src_lines, lines)):
         pseu = frenchify(pseu)
         code_line = format_code_line(src)
-        if i == last_index and len(code_line.strip()) == 0:
+        if i == last_index and len(code_line.strip()) + len(pseu.strip()) == 0:
             # keep last line without annotation if empty, reduces glitches in editor
             output_lines.append(code_line)
         else:
