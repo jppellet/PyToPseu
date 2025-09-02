@@ -35,12 +35,12 @@ import math                                               #│   on va utiliser 
                                                           #│   
 some_float: float       = 0.182                           #│   dans s̲o̲m̲e̲ ̲f̲l̲o̲a̲t̲, prévu pour un nombre à virgule,
                                                           #│   │     └╴ stocke 0.182
-some_float_rounded_up   = math.ceil(some_float)  # 1      #│   dans s̲o̲m̲e̲ ̲f̲l̲o̲a̲t̲ ̲r̲o̲u̲n̲d̲e̲d̲ ̲u̲p, stocke l’arrondi supérieur de s̲o̲m̲e̲ ̲f̲l̲o̲a̲t̲
-some_float_rounded_down = math.floor(some_float) # 0      #│   dans s̲o̲m̲e̲ ̲f̲l̲o̲a̲t̲ ̲r̲o̲u̲n̲d̲e̲d̲ ̲d̲o̲w̲n̲, stocke l’arrondi inférieur de s̲o̲m̲e̲ ̲f̲l̲o̲a̲t̲
+some_float_rounded_up   = math.ceil(some_float)  # 1      #│   dans s̲o̲m̲e̲ ̲f̲l̲o̲a̲t̲ ̲r̲o̲u̲n̲d̲e̲d̲ ̲u̲p, stocke s̲o̲m̲e̲ ̲f̲l̲o̲a̲t̲ arrondi vers le haut
+some_float_rounded_down = math.floor(some_float) # 0      #│   dans s̲o̲m̲e̲ ̲f̲l̲o̲a̲t̲ ̲r̲o̲u̲n̲d̲e̲d̲ ̲d̲o̲w̲n̲, stocke s̲o̲m̲e̲ ̲f̲l̲o̲a̲t̲ arrondi vers le bas
 some_float_as_int       = int(some_float)        # 0      #│   dans s̲o̲m̲e̲ ̲f̲l̲o̲a̲t̲ ̲a̲s̲ ̲i̲n̲t̲, stocke la conversion en nombre entier de s̲o̲m̲e̲ ̲f̲l̲o̲a̲t̲
                                                           #│   
                                                           #│   
-math.ceil(some_float)                                     #│   l’arrondi supérieur de s̲o̲m̲e̲ ̲f̲l̲o̲a̲t̲
+math.ceil(some_float)                                     #│   s̲o̲m̲e̲ ̲f̲l̲o̲a̲t̲ arrondi vers le haut
 print(some_variable)                                      #│   affiche s̲o̲m̲e̲ ̲v̲a̲r̲i̲a̲b̲l̲e̲
                                                           #│   
                                                           #│   
@@ -67,31 +67,31 @@ my_substring = my_string[1:4].upper()                     #│   dans m̲y ̲s̲
 second_part = my_name[5:len(my_name)]                     #│   dans s̲e̲c̲o̲n̲d̲ ̲pa̲r̲t̲, stocke les éléments de m̲y ̲n̲a̲m̲e̲ à partir de la position 5
 second_part = my_name[5:] # équivalent                    #│   dans s̲e̲c̲o̲n̲d̲ ̲pa̲r̲t̲, stocke les éléments de m̲y ̲n̲a̲m̲e̲ à partir de la position 5
                                                           #│   
-first_char = my_name[0]                                   #│   dans f̲i̲r̲s̲t̲ ̲c̲h̲a̲r̲, stocke l'élément 0 de m̲y ̲n̲a̲m̲e̲
+first_char = my_name[0]                                   #│   dans f̲i̲r̲s̲t̲ ̲c̲h̲a̲r̲, stocke l’élément 0 de m̲y ̲n̲a̲m̲e̲
                                                           #│   
-print(f"Durée du trajet: {duration} h")                   #│   affiche l'expansion de 'Durée du trajet: {duration} h'
+print(f"Durée du trajet: {duration} h")                   #│   affiche l’expansion de 'Durée du trajet: {duration} h'
                                                           #│   
-print(f"On a l’ensemble A = {{ x | x > {min_value} }}")   #│   affiche l'expansion de 'On a l’ensemble A = {{ x | x > {min_value} }}'
+print(f"On a l’ensemble A = {{ x | x > {min_value} }}")   #│   affiche l’expansion de 'On a l’ensemble A = {{ x | x > {min_value} }}'
                                                           #│   
 duration_hours, rest = divmod(distance, speed)            #│   dans (̲d̲u̲r̲a̲t̲i̲o̲n̲ ̲h̲o̲u̲r̲s̲,̲ ̲r̲e̲s̲t̲)̲, stocke le résultat de la fonction divmod avec d̲i̲s̲t̲a̲n̲c̲e̲, s̲pe̲e̲d̲
                                                           #│   
-age = input("Quel âge avez-vous? ")                       #│   dans a̲ge̲, stocke la réponse de l'utilisateur à la question "Quel âge avez-vous? "
+age = input("Quel âge avez-vous? ")                       #│   dans a̲ge̲, stocke la réponse de l’utilisateur à la question "Quel âge avez-vous? "
 print("Age actuel:", age)                                 #│   affiche "Age actuel:" et a̲ge̲
                                                           #│   
 print("Dans deux ans:", age + 2)                          #│   affiche "Dans deux ans:" et la somme de a̲ge̲ et 2
                                                           #│   
-print("Dans deux ans:", (int(age) + 2))                   #│   affiche "Dans deux ans:" et la somme de la conversion en nombre entier de a̲ge̲ et 2
+print("Dans deux ans:", (int(age) + 2))                   #│   affiche "Dans deux ans:" et la somme de ⟨la conversion en nombre entier de a̲ge̲⟩ et 2
                                                           #│   
                                                           #│   
-age2 = int(age) + 2                                       #│   dans a̲ge̲2̲, stocke la somme de la conversion en nombre entier de a̲ge̲ et 2
+age2 = int(age) + 2                                       #│   dans a̲ge̲2̲, stocke la somme de ⟨la conversion en nombre entier de a̲ge̲⟩ et 2
 print("Dans deux ans:", age2)                             #│   affiche "Dans deux ans:" et a̲ge̲2̲
                                                           #│   
-age = int(input("Quel âge avez-vous? "))                  #│   dans a̲ge̲, stocke la conversion en nombre entier de la réponse de l'utilisateur à la question "Quel âge avez-vous? "
+age = int(input("Quel âge avez-vous? "))                  #│   dans a̲ge̲, stocke la conversion en nombre entier de la réponse de l’utilisateur à la question "Quel âge avez-vous? "
 print("Age actuel:", age)                                 #│   affiche "Age actuel:" et a̲ge̲
 print("Dans deux ans:", age + 2)                          #│   affiche "Dans deux ans:" et la somme de a̲ge̲ et 2
                                                           #│   
                                                           #│   
-my_string = input()                                       #│   dans m̲y ̲s̲t̲r̲i̲n̲g, stocke ce que l'utilisateur va taper
+my_string = input()                                       #│   dans m̲y ̲s̲t̲r̲i̲n̲g, stocke ce que l’utilisateur va taper
 limit = 10                                                #│   dans l̲i̲m̲i̲t̲, stocke 10
                                                           #│   
 if len(my_string) > limit:                                #│   si la longueur de m̲y ̲s̲t̲r̲i̲n̲g est plus grand que l̲i̲m̲i̲t̲:
@@ -126,7 +126,7 @@ if (not x > 1) or (x > 1 and x < 100):                    #│   si ⟨x̲ est p
                                                           #│   
                                                           #│   
                                                           #│   
-name: str = input("Tapez votre nom: ")                    #│   dans n̲a̲m̲e̲, prévu pour une chaîne de caractères, stocke la réponse de l'utilisateur à la question "Tapez votre nom: "
+name: str = input("Tapez votre nom: ")                    #│   dans n̲a̲m̲e̲, prévu pour une chaîne de caractères, stocke la réponse de l’utilisateur à la question "Tapez votre nom: "
 is_compound_name: bool = "-" in name or " " in name       #│   dans i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲, prévu pour une valeur vrai/faux,
                                                           #│   │     └╴ stocke vrai/faux selon si "-" fait partie de n̲a̲m̲e̲ ou " " fait partie de n̲a̲m̲e̲
 is_long_name: bool = len(name) > 10                       #│   dans i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲, prévu pour une valeur vrai/faux,
@@ -143,7 +143,7 @@ elif not is_compound_name and not is_long_name:           #│   sinon, si i̲s�
     print("Votre nom est court et simple")                #│   │   affiche "Votre nom est court et simple"
                                                           #│   
                                                           #│   
-name: str = input("Tapez votre nom: ")                    #│   dans n̲a̲m̲e̲, prévu pour une chaîne de caractères, stocke la réponse de l'utilisateur à la question "Tapez votre nom: "
+name: str = input("Tapez votre nom: ")                    #│   dans n̲a̲m̲e̲, prévu pour une chaîne de caractères, stocke la réponse de l’utilisateur à la question "Tapez votre nom: "
 is_compound_name: bool = "-" in name or " " in name       #│   dans i̲s̲ ̲c̲o̲m̲po̲u̲n̲d̲ ̲n̲a̲m̲e̲, prévu pour une valeur vrai/faux,
                                                           #│   │     └╴ stocke vrai/faux selon si "-" fait partie de n̲a̲m̲e̲ ou " " fait partie de n̲a̲m̲e̲
 is_long_name: bool = len(name) > 10                       #│   dans i̲s̲ ̲l̲o̲n̲g ̲n̲a̲m̲e̲, prévu pour une valeur vrai/faux,

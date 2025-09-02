@@ -2,7 +2,7 @@ import { loadPyodide } from 'pyodide'
 
 import { autocompletion } from '@codemirror/autocomplete'
 import { python } from '@codemirror/lang-python'
-import { Prec } from '@codemirror/state'
+import { Compartment, Prec } from '@codemirror/state'
 import { keymap, lineNumbers } from '@codemirror/view'
 import { EditorView, basicSetup } from 'codemirror'
 
@@ -35,6 +35,15 @@ async function main() {
     let saveToURL: () => Promise<void>
 
     let ignoreUpdate = false
+
+    let browserLang = (navigator.language ?? (navigator as any).userLanguage)?.toLowerCase()
+    if (browserLang && browserLang.length >= 2) {
+        browserLang = browserLang.substring(0, 2)
+    }
+
+    const url = new URL(window.location.href)
+    const lang = url.searchParams.get('l')
+    const currentLang = lang ?? browserLang ?? "en"
 
     const clearLineAndUpdateListener = EditorView.updateListener.of((update) => {
         if (ignoreUpdate || !update.docChanged) {
@@ -73,13 +82,16 @@ async function main() {
         changeListenerTimeoutHandle = setTimeout(updateAnnotations, 1000)
     })
 
-    const initialCode = "# Tapez votre code ci-dessous\n"
+    const initialCode = currentLang === "en" ? "# Type your code below\n" : "# Tapez votre code ci-dessous\n"
+
+    const editableCompartment = new Compartment()
 
     const editor = new EditorView({
         doc: initialCode,
         selection: { anchor: initialCode.length },
         extensions: [
             basicSetup,
+            editableCompartment.of(EditorView.editable.of(true)), // initially editable
             lineNumbers(),
             python(),
             autocompletion(),
@@ -101,16 +113,27 @@ async function main() {
                 ".cm-line, .cm-gutterElement": {
                     height: "24px",
                 },
-            }
-            ),
+            }),
         ],
         parent: document.body,
     })
 
+    function toggleReadOnly(readOnly?: boolean) {
+        readOnly ??= !editor.state.facet(EditorView.editable)
+        editor.dispatch({
+            effects: editableCompartment.reconfigure(
+                EditorView.editable.of(readOnly) // flip it
+            )
+        })
+    }
+
     async function updateAnnotationsFor(userCode: string) {
         try {
             const pyodide = await initPyodide
-            await pyodide.runPythonAsync(`__user_code__ = ${JSON.stringify(userCode)}`)
+            await pyodide.runPythonAsync(
+                `__user_code__ = ${JSON.stringify(userCode)}\n` +
+                `__user_lang__ = ${JSON.stringify(currentLang)}\n`
+            )
             let runResult = await pyodide.runPythonAsync(PyToPseu)
             if (typeof runResult === "object" && "toJs" in runResult) {
                 runResult = runResult.toJs()
@@ -197,26 +220,44 @@ async function main() {
         })
     })
 
+    let initialCodeFromParam: string | undefined = undefined
+    const compressedCode = url.searchParams.get('t')
+    if (compressedCode) {
+        const code = LZString.decompressFromEncodedURIComponent(compressedCode)
+        if (code) {
+            initialCodeFromParam = code
+            editor.dispatch(editor.state.update({
+                changes: { from: 0, to: editor.state.doc.length, insert: "# Loading code..." },
+            }))
+
+            toggleReadOnly(false)
+        }
+    }
+
+
     // check if there is code to preload the editor with in the URL
     initPyodide.then(() => {
-        const url = new URL(window.location.href)
-        const compressedCode = url.searchParams.get('t')
-        if (compressedCode) {
-            const code = LZString.decompressFromEncodedURIComponent(compressedCode)
-            if (code) {
-                updateAnnotationsFor(code).then(() => {
-                    // move cursor to end
-                    editor.dispatch(editor.state.update({
-                        selection: { anchor: editor.state.doc.length }
-                    }))
-                })
-            }
+        if (initialCodeFromParam) {
+            updateAnnotationsFor(initialCodeFromParam).then(() => {
+                // move cursor to end
+                editor.dispatch(editor.state.update({
+                    selection: { anchor: editor.state.doc.length }
+                }))
+                toggleReadOnly(true)
+            })
         }
     })
 
     // set focus to editor
     editor.focus()
 }
+
+
+// async function initPyodideAndLoadPackages() {
+//     const pyodide = await doLoadPyodide();
+//     await pyodide.loadPackage(BASE_EXTERNAL_PACKAGES);
+//     return pyodide;
+// }
 
 
 // function preambleLength(doc: Text): number {

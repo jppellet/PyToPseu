@@ -5,17 +5,14 @@ Code                            │   Interprétation
 import typing                  #│   on va utiliser le module t̲ypi̲n̲g
                                #│   
 l: list[int] = []              #│   dans l̲, prévu pour une liste de nombres entiers, stocke une liste vide
-                               #│   
-l = [1,2, 3]                   #│   dans l̲, stocke une liste avec les éléments 1, 2 et 3
-                               #│   
-l: typing.List[str] = 3        #│   dans l̲, prévu pour une liste de chaînes de caractères,
-                               #│   │     └╴ stocke 3
-                               #│   
-l: list[list[int]] = []        #│   dans l̲, prévu pour une liste de listes de nombres entiers,
+l = [1, 2, 3]                  #│   dans l̲, stocke une liste avec les éléments 1, 2 et 3
+ll: list[list[int]] = []       #│   dans l̲l̲, prévu pour une liste de listes de nombres entiers,
                                #│   │     └╴ stocke une liste vide
                                #│   
 l: int = list()                #│   dans l̲, prévu pour un nombre entier, stocke une liste vide
                                #│   
+l: typing.List[str] = 3        #│   dans l̲, prévu pour une liste de chaînes de caractères,
+                               #│   │     └╴ stocke 3
 d: dict[str, list[str]] = {}   #│   dans d̲, prévu pour un dictionnaire reliant des chaînes de caractères à des listes de chaînes de caractères,
                                #│   │     └╴ stocke un dictionnaire vide
                                #│   
@@ -26,9 +23,9 @@ l.insert() # bad               #│   dans l̲, insère quelque chose de mal dé
 l.insert(b, 42)                #│   à la position b̲ de l̲, insère 42
 l.remove(42)                   #│   de l̲, retire 42
                                #│   
-l.pop()                        #│   de l̲, retire le dernier élément
+l.pop()                        #│   de l̲, supprime le dernier élément
                                #│   
-l.pop(3)                       #│   de l̲, retire l'élément à la position 3
+l.pop(3)                       #│   de l̲, supprime l’élément à la position 3
                                #│   
 l.clear()                      #│   supprime tous les éléments de l̲
                                #│   

@@ -11,7 +11,9 @@
     "bundle": "./tools/build.js",
     "bundle-watch": "npm-watch bundle",
     "server": "./tools/local_server.py 8089",
-    "deploy": "./tools/deploy-jpp.sh"
+    "deploy": "./tools/deploy-jpp.sh",
+    "testfiles-watch": "npm-watch testfiles",
+    "testfiles": "python3.13 pytopseu.py"
   },
   "watch": {
     "bundle": {
@@ -27,6 +29,12 @@
         "web"
       ],
       "extensions": "ts"
+    },
+    "testfiles": {
+      "patterns": [
+        "sample_src"
+      ],
+      "extensions": "py"
     }
   },
   "author": "Jean-Philippe Pellet",

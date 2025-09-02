@@ -1,5 +1,5 @@
 a = lambda: 42
-a = lambda x: x + 1
+a = lambda x: x ** 4
 a = lambda x, y: x + 1
 a = lambda x, y, z: x + 1
 
@@ -10,8 +10,8 @@ def b() -> int:
 def b(x) -> int:
     return x + 1
 
-def b(x, y) -> int:
-    return x + 1
+def add_abs(x, y) -> int:
+    return abs(x) + abs(y)
 
 def b(x, y, z) -> int:
     return x + 1

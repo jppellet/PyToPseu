@@ -1,15 +1,12 @@
 import typing
 
 l: list[int] = []
-
-l = [1,2, 3]
-
-l: typing.List[str] = 3
-
-l: list[list[int]] = []
+l = [1, 2, 3]
+ll: list[list[int]] = []
 
 l: int = list()
 
+l: typing.List[str] = 3
 d: dict[str, list[str]] = {}
 
 l.append(42)
