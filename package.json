@@ -13,13 +13,13 @@
     "server": "./tools/local_server.py 8089",
     "deploy": "./tools/deploy-jpp.sh",
     "testfiles-watch": "npm-watch testfiles",
-    "testfiles": "python3.13 pytopseu.py"
+    "testfiles": "python3 -m pytopseu.test"
   },
   "watch": {
     "bundle": {
       "patterns": [
         "web",
-        "pytopseu.py"
+        "pytopseu"
       ],
       "ignore": "simulator/lib",
       "extensions": "ts,py"

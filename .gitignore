@@ -3,3 +3,4 @@
 web/bundle.js*
 /tools/deploy-jpp.sh
 sample_src/tmp*
+__pycache__
