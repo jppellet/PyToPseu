@@ -142,7 +142,12 @@ async function main() {
         try {
             const pyodide = await initPyodide
             let runResult = await pyodide.runPythonAsync(
-                `import pytopseu\npytopseu.annotate_code_and_get_as_json(${JSON.stringify(userCode)}, ${JSON.stringify(currentLang)})`
+                'import pytopseu\n' +
+				'pytopseu.annotate_code_and_get_as_json(' +
+					`${JSON.stringify(userCode)}, ` +
+					`${JSON.stringify(currentLang)}, ` +
+					'underline_variable_names=True' +
+				')'
             );
             if (typeof runResult === "object" && "toJs" in runResult) {
                 runResult = runResult.toJs()

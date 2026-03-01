@@ -14,6 +14,8 @@ from .pseudocode_dictionary import PseudocodeDictionary
 CURRENT_LINE = -1
 ASTERISKS = ["*", "†", "‡", "§", "‖", "¶", "Δ", "◊"]
 
+CHARACTERS_WITH_LOWER_UNDERLINE = "gjpqy"
+
 
 def try_infer_type_of(expr: ast.expr) -> type | None:
     match expr:
@@ -88,16 +90,13 @@ def unparsed(expr: ast.AST) -> str:
     return ast.unparse(expr)
 
 
-HAS_LOWER_UNDERLINE = "gjpqy"
-
-
 def fake_underline_helper(string: str, u: str) -> str:
-    all_lower = all(c in HAS_LOWER_UNDERLINE for c in string)
+    all_lower = all(c in CHARACTERS_WITH_LOWER_UNDERLINE for c in string)
 
     def subs(c: str) -> str:
         if c == "_":
             return " " + u
-        if not all_lower and c in HAS_LOWER_UNDERLINE:
+        if not all_lower and c in CHARACTERS_WITH_LOWER_UNDERLINE:
             return c
         return c + u
 
@@ -110,10 +109,6 @@ def fake_underline(string: str) -> str:
 
 def fake_double_underline(string: str) -> str:
     return fake_underline_helper(string, "\u0333")
-
-
-def var(name: str) -> str:
-    return fake_underline(name)
 
 
 def unhandled(msg: str) -> None:
@@ -175,10 +170,12 @@ class Analyzer(ast.NodeVisitor):
     def __init__(
         self,
         format: PseudocodeFormat,
-        pseudocode_dictionary: PseudocodeDictionary
+        pseudocode_dictionary: PseudocodeDictionary,
+        underline_variable_names: bool = False
     ) -> None:
         self.format = format
         self.pd = pseudocode_dictionary
+        self.underline_variable_names = underline_variable_names
         self._out_buffer: list[OutStr] = []
         self._indent = 0
         self._stack: list[ast.AST] = []
@@ -348,6 +345,9 @@ class Analyzer(ast.NodeVisitor):
 
         return str(helper(expr, plural)[0])
 
+    def var(self, name: str) -> str:
+        return fake_underline(name) if self.underline_variable_names else name
+
     def visit(self, node: ast.AST | None, insert_brace_if_complex=False) -> None:
         if node is None:
             return
@@ -372,7 +372,7 @@ class Analyzer(ast.NodeVisitor):
             self.visit(stmt)
 
     def visit_Import(self, node: ast.Import) -> None:
-        imports = [f"{var(alias.name)}" for alias in node.names]
+        imports = [f"{self.var(alias.name)}" for alias in node.names]
         what = str(
             self.pd.the_modules if len(imports) > 1
             else self.pd.the_module
@@ -385,14 +385,14 @@ class Analyzer(ast.NodeVisitor):
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         module = node.module
         imports = [
-            f"{var(alias.name)}{self.pd._calling_it.format(alias=var(alias.asname)) if alias.asname else ""}"
+            f"{self.var(alias.name)}{self.pd._calling_it.format(alias=self.var(alias.asname)) if alias.asname else ""}"
             for alias in node.names
         ]
         what = str(
             self.pd.the_elements if len(imports) > 1
             else self.pd.the_element
         )
-        self.append(node, self.pd.well_use_from_module.format(what=what, names=", ".join(imports), mod=var(module)))
+        self.append(node, self.pd.well_use_from_module.format(what=what, names=", ".join(imports), mod=self.var(module)))
         for alias in node.names:
             name = alias.asname or alias.name
             self.new_name(name, VarFuncClass())
@@ -409,11 +409,11 @@ class Analyzer(ast.NodeVisitor):
                 case ast.Subscript(value, slice):
                     # TODO slice may not be a variable
                     target_desc = self.pd.position_i_of.format(
-                        index=var(unparsed(slice)),
-                        var=var(unparsed(value))
+                        index=self.var(unparsed(slice)),
+                        var=self.var(unparsed(value))
                     )
                 case _:
-                    target_desc = var(unparsed(node.targets[0]))
+                    target_desc = self.var(unparsed(node.targets[0]))
 
             match node.value:
                 case ast.BinOp(ast.Name(src), ast.Add(), inc) | ast.BinOp(inc, ast.Add(), ast.Name(src)) if (
@@ -459,7 +459,7 @@ class Analyzer(ast.NodeVisitor):
             self.append(
                 node,
                 self.pd.prepare_var_for_type.format(
-                    var=var(unparsed(node.target)),
+                    var=self.var(unparsed(node.target)),
                     type=self.readable_type(node.annotation)
                 ),
             )
@@ -467,7 +467,7 @@ class Analyzer(ast.NodeVisitor):
             self.append(
                 node,
                 self.pd.in_var_for_type_.format(
-                    var=var(unparsed(node.target)),
+                    var=self.var(unparsed(node.target)),
                     type=self.readable_type(node.annotation)
                 ),
             )
@@ -481,27 +481,27 @@ class Analyzer(ast.NodeVisitor):
             case ast.Add():
                 self.append(node, self.pd.add_)
                 self.visit(node.value)
-                self.append(node, self.pd._to_dest.format(dest=var(ident)))
+                self.append(node, self.pd._to_dest.format(dest=self.var(ident)))
             case ast.Sub():
-                self.append(node, self.pd.subtract_src_.format(dest=var(ident)))
+                self.append(node, self.pd.subtract_src_.format(dest=self.var(ident)))
                 self.visit(node.value)
             case ast.Mult():
-                self.append(node, self.pd.multiply_by_.format(dest=var(ident)))
+                self.append(node, self.pd.multiply_by_.format(dest=self.var(ident)))
                 self.visit(node.value)
             case ast.Div():
-                self.append(node, self.pd.divide_by_.format(dest=var(ident)))
+                self.append(node, self.pd.divide_by_.format(dest=self.var(ident)))
                 self.visit(node.value)
             case ast.FloorDiv():
-                self.append(node, self.pd.int_divide_by_.format(dest=var(ident)))
+                self.append(node, self.pd.int_divide_by_.format(dest=self.var(ident)))
                 self.visit(node.value)
             case ast.Mod():
-                self.append(node, self.pd.store_mod_.format(dest=var(ident), src=var(ident)))
+                self.append(node, self.pd.store_mod_.format(dest=self.var(ident), src=self.var(ident)))
                 self.visit(node.value)
             case ast.Pow():
-                self.append(node, self.pd.store_power_.format(dest=var(ident), src=var(ident)))
+                self.append(node, self.pd.store_power_.format(dest=self.var(ident), src=self.var(ident)))
                 self.visit(node.value)
             case _:
-                self.append(node, self.pd.store_op_.format(dest=var(ident), src=var(ident), op=node.op))
+                self.append(node, self.pd.store_op_.format(dest=self.var(ident), src=self.var(ident), op=node.op))
                 self.visit_stored(node.value)
         self.new_name(node.target, Var(type=None))
 
@@ -862,11 +862,11 @@ class Analyzer(ast.NodeVisitor):
                                 # TODO find if we are in an expression or a statement
                                 is_statement = False
                                 if is_statement:
-                                    self.append(node, self.pd.call_method_.format(m=var(method)))
+                                    self.append(node, self.pd.call_method_.format(m=self.var(method)))
                                     append_expr()
                                     append_args(first_prefix=self.pd._with_)
                                 else:
-                                    self.append(node, self.pd.the_result_of_method_.format(m=var(method)))
+                                    self.append(node, self.pd.the_result_of_method_.format(m=self.var(method)))
                                     append_expr()
                                     append_args(first_prefix=self.pd._with_)
                     case _:
@@ -880,7 +880,7 @@ class Analyzer(ast.NodeVisitor):
                             append_args(first_prefix=self.pd._with_)
 
     def visit_Name(self, node: ast.Name) -> None:
-        self.append(node, var(node.id))
+        self.append(node, self.var(node.id))
 
     def visit_collection(self, node: ast.List | ast.Set | ast.Tuple, name: str) -> None:
         num_elems = len(node.elts)
@@ -982,14 +982,14 @@ class Analyzer(ast.NodeVisitor):
         self.visit(node.value)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-        self.append(node, self.pd.define_function_.format(name=var(node.name)))
+        self.append(node, self.pd.define_function_.format(name=self.var(node.name)))
         for arg in node.args.args:
             self.new_name(arg.arg, Var(type=arg.annotation))
         num_args = len(node.args.args)
         needs_and = num_args > 0
 
         def append_arg(arg: ast.arg) -> None:
-            self.append(arg, var(arg.arg), allow_break=True)
+            self.append(arg, self.var(arg.arg), allow_break=True)
             if arg.annotation:
                 self.append(arg, " (")
                 self.append(arg, self.readable_type(arg.annotation))
@@ -1035,16 +1035,16 @@ class Analyzer(ast.NodeVisitor):
             self.append(node, self.pd.without_arguments)
         elif num_args == 1:
             self.append(node, self.pd.which_accepts_one_argument_)
-            self.append(node, var(node.args.args[0].arg))
+            self.append(node, self.var(node.args.args[0].arg))
             self.append(node, ",")
             self.append(node, self.pd._and)
         else:
             self.append(node, self.pd.which_accepts_n_arguments_.format(n=num_args))
             for arg, is_last in track_last(node.args.args):
                 if not is_last:
-                    self.append(node, f", {var(arg.arg)}")
+                    self.append(node, f", {self.var(arg.arg)}")
                 else:
-                    self.append(node, self.pd._and_ + var(arg.arg))
+                    self.append(node, self.pd._and_ + self.var(arg.arg))
                     self.append(node, ",")
                     self.append(node, self.pd._and)
         self.append(node, self.pd._which_returns_, allow_break=True)
@@ -1061,7 +1061,7 @@ class Analyzer(ast.NodeVisitor):
                 self.append(node, self.pd.repeat_as_many_times_as_elements_in_)
                 self.visit(iterable, insert_brace_if_complex=True)
                 if not is_throwaway_var:
-                    self.append(node, self.pd._counting_with_var_from_0.format(var=var(loop_var)), allow_break=True)
+                    self.append(node, self.pd._counting_with_var_from_0.format(var=self.var(loop_var)), allow_break=True)
                 else:
                     self.append(node, f":")
 
@@ -1071,7 +1071,7 @@ class Analyzer(ast.NodeVisitor):
                 args=[to] | [ast.Constant(value=0), to] | [ast.Constant(value=0), to, ast.Constant(value=1)],
             ):
                 with_loop_var = (
-                    "" if is_throwaway_var else self.pd._counting_with_var_from_0.format(var=var(loop_var))
+                    "" if is_throwaway_var else self.pd._counting_with_var_from_0.format(var=self.var(loop_var))
                 )
 
                 self.append(node, self.pd.repeat_)
@@ -1088,7 +1088,7 @@ class Analyzer(ast.NodeVisitor):
                         case ast.Tuple([ast.Name(index), ast.Name(elem)]):
                             self.append(
                                 node,
-                                self.pd._which_well_call_and_number_from_.format(elem=var(elem), index=var(index)),
+                                self.pd._which_well_call_and_number_from_.format(elem=self.var(elem), index=self.var(index)),
                                 allow_break=True,
                             )
                             if len(other_args) == 1:
@@ -1101,14 +1101,14 @@ class Analyzer(ast.NodeVisitor):
                             unhandled("single loop variable for enumerate")
 
             case ast.Constant(str(value)):
-                with_loop_var = "" if is_throwaway_var else self.pd._which_well_call.format(elem=var(loop_var))
+                with_loop_var = "" if is_throwaway_var else self.pd._which_well_call.format(elem=self.var(loop_var))
                 self.append(node, self.pd.repeat_for_each_character_in_.format(str=value, details=with_loop_var))
                 self.append(node, ":")
 
             case _:
                 self.append(node, self.pd.repeat_for_each_item_of_)
                 self.visit(node.iter)
-                with_loop_var = "" if is_throwaway_var else self.pd._which_well_call.format(elem=var(loop_var))
+                with_loop_var = "" if is_throwaway_var else self.pd._which_well_call.format(elem=self.var(loop_var))
                 self.append(node, f"{with_loop_var}:")
 
         self.indent()
@@ -1174,7 +1174,7 @@ class Analyzer(ast.NodeVisitor):
                     self.append(node, self.pd._with_one_elements_out_of.format(step=step))
 
             case ast.Name(id) if len(id) == 1:
-                self.append(node, self.pd.ith_element_of_.format(index=var(id)))
+                self.append(node, self.pd.ith_element_of_.format(index=self.var(id)))
                 self.visit(node.value)
             case index:
                 self.append(node, self.pd.the_element_at_position_)
@@ -1313,7 +1313,7 @@ class Analyzer(ast.NodeVisitor):
                 def is_inclusive_op(op: ast.cmpop) -> bool:
                     return isinstance(op, (ast.LtE, ast.GtE))
 
-                self.append(node, var(name))
+                self.append(node, self.var(name))
                 self.append(node, self.pd._is_between_)
                 self.visit(lower)
                 self.append(
@@ -1375,6 +1375,7 @@ def annotate_code(
     source: str,
     pseudocode_format: PseudocodeFormat,
     pseudocode_dictionary: PseudocodeDictionary,
+    underline_variable_names: bool = False,
     dump_ast: bool = False
 ) -> AnnotationResult | None:
 
@@ -1418,7 +1419,11 @@ def annotate_code(
     if dump_ast:
         print(ast.dump(tree, indent=4))
 
-    analyzer = Analyzer(pseudocode_format, pseudocode_dictionary)
+    analyzer = Analyzer(
+        pseudocode_format,
+        pseudocode_dictionary,
+        underline_variable_names=underline_variable_names
+    )
     analyzer.visit(tree)
 
     if dump_ast:
@@ -1496,7 +1501,11 @@ def annotate_code(
     )
 
 
-def annotate_code_and_get_as_json(code: str, lang: str) -> str | None:
+def annotate_code_and_get_as_json(
+    code: str,
+    lang: str,
+    underline_variable_names: bool = False
+) -> str | None:
     result_json: str | None = None
 
     pseudocode_format = python_pseudocode_format
@@ -1504,7 +1513,12 @@ def annotate_code_and_get_as_json(code: str, lang: str) -> str | None:
     pseudocode_dictionary: PseudocodeDictionary = language_pseudocode_dictionaries[lang]
 
     if isinstance(code, str):
-        result = annotate_code(code, pseudocode_format, pseudocode_dictionary)
+        result = annotate_code(
+            code,
+            pseudocode_format,
+            pseudocode_dictionary,
+            underline_variable_names=underline_variable_names
+        )
         if result:
             result_json = json.dumps(result._asdict())
         else:

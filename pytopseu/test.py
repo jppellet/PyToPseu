@@ -26,7 +26,13 @@ def annotate_file(
     with open(file, "r", encoding="utf8") as source_file:
         source = source_file.read()
 
-    annotated = annotate_code(source, pseudocode_format, pseudocode_dictionary, dump_ast)
+    annotated = annotate_code(
+        source,
+        pseudocode_format,
+        pseudocode_dictionary,
+        underline_variable_names=True,
+        dump_ast=dump_ast
+    )
     if not annotated:
         print("Syntax error")
         return
