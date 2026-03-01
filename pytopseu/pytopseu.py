@@ -1379,37 +1379,30 @@ def annotate_code(
     dump_ast: bool = False
 ) -> AnnotationResult | None:
 
-    MAX_LINE_WIDTH = 60
-    V_BAR = "│"
-    PYTHON_ANN_SEP = "#" + V_BAR
-    CONTINUATION_MARK = "└╴"
-    PREAMBLE_LENGTH = 4
-    MIN_CODE_WIDTH = 25
     LEFT_COL_HEADER = pseudocode_dictionary.Code
     RIGHT_COL_HEADER = pseudocode_dictionary.Interpretation
+
+    src_lines = source.split("\n")
 
     input_continuations: list[int] = []
 
     # Strip our own annotations if we find them
-    def strip_ann(line: str, number: int) -> str | None:
+    def track_and_filter_out_input_continuations(line: str, number: int) -> str | None:
         if CONTINUATION_MARK in line:
             input_continuations.append(number)
             return None
-        return line.split(PYTHON_ANN_SEP, 1)[0].rstrip()
+        return line
 
     src_lines = [
-        line_ for n, line in enumerate(source.split("\n"), 1) if (line_ := strip_ann(line, n)) is not None
+        line_ for n, line in enumerate(src_lines, 1)
+            if (line_ := track_and_filter_out_input_continuations(line, n)) is not None
     ]
-    input_had_preamble = False
-    if (
-        len(src_lines) >= PREAMBLE_LENGTH
-        and src_lines[0].startswith('"""')
-        and src_lines[PREAMBLE_LENGTH - 1].startswith('"""')
-        and src_lines[2].startswith("———")
-        and src_lines[1].startswith(LEFT_COL_HEADER)
-    ):
-        input_had_preamble = True
-        src_lines = src_lines[4:]
+
+    input_had_preamble = code_has_preamble(src_lines, pseudocode_dictionary)
+    if input_had_preamble:
+        src_lines = src_lines[PREAMBLE_LENGTH:]
+
+    src_lines = list(map(strip_line_annotations, src_lines))
 
     try:
         tree = ast.parse("\n".join(src_lines), type_comments=True)
