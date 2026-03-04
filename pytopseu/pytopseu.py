@@ -149,10 +149,12 @@ class VarFuncClass(NamedTuple):
 
 NameInfo = Module | Var | Func | Class | VarFuncClass
 
+U = TypeVar("U", bound="NameInfo")
 
-def name_matches[T: NameInfo](
-    obj: NameInfo, cls: Type[T], pred: Callable[[T], bool] | None = None
-) -> TypeIs[T]:
+
+def name_matches(
+    obj: NameInfo, cls: Type[U], pred: Callable[[U], bool] | None = None
+) -> TypeIs[U]:
     return isinstance(obj, cls) and (pred is None or pred(obj))
 
 
@@ -390,7 +392,7 @@ class Analyzer(ast.NodeVisitor):
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         module = node.module
         imports = [
-            f"{self.var(alias.name)}{self.pd._calling_it.format(alias=self.var(alias.asname)) if alias.asname else ""}"
+            f"{self.var(alias.name)}{self.pd._calling_it.format(alias=self.var(alias.asname)) if alias.asname else ''}"
             for alias in node.names
         ]
         what = str(
@@ -1468,12 +1470,13 @@ def annotate_code(
     )
 
     sep = PYTHON_ANN_SEP if pseudocode_format == python_pseudocode_format else "|"
+    triple_quotes = '"""'
     header_sep = "" if pseudocode_format != python_pseudocode_format \
-        else f"{'"""':{max_src_width}}{margin_left}{sep}"
+        else f"{triple_quotes:{max_src_width}}{margin_left}{sep}"
 
     output_lines: list[str] = []
 
-    output_lines.append('"""')
+    output_lines.append(triple_quotes)
     output_lines.append(
         f"{LEFT_COL_HEADER:{max_src_width+1}}{margin_left}{sep[-1]}{margin_right}{RIGHT_COL_HEADER}"
     )
