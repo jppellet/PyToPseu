@@ -2,7 +2,7 @@ import ast
 import json
 
 from types import EllipsisType, NoneType
-from typing import Callable, Iterable, Iterator, NamedTuple, Type
+from typing import Callable, Iterable, Iterator, NamedTuple, Type, TypeVar
 
 from typing_extensions import TypeIs
 
@@ -77,7 +77,10 @@ def try_infer_type_of(expr: ast.expr) -> type | None:
         #  | Slice(expr? lower, expr? upper, expr? step)
 
 
-def track_last[T](iterable: Iterable[T]) -> Iterator[tuple[T, bool]]:
+T = TypeVar("T")
+
+
+def track_last(iterable: Iterable[T]) -> Iterator[tuple[T, bool]]:
     it = iter(iterable)
     prev = next(it)
     for current in it:
@@ -203,7 +206,9 @@ class Analyzer(ast.NodeVisitor):
         self._allow_break_for_next = False
         self._out_buffer.append(OutStr(line + linedelta, self._indent, str(msg), allow_break))
 
-    def sep_join[A: ast.expr | ast.stmt | ast.arg](
+    A = TypeVar("A", bound=ast.expr | ast.stmt | ast.arg)
+
+    def sep_join(
         self,
         items: Iterable[A],
         sep: str = ", ",
