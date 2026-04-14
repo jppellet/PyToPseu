@@ -2,8 +2,7 @@
 Code                            │   Interpretation
 ——————————————————————————————————————————————————————————————————
 """                            #│
-import typing  # │   we'll use the module t̲ypi̲n̲g
-
+import typing                  #│   we'll use the module t̲ypi̲n̲g
                                #│   
 l: list[int] = []              #│   in l̲, intended for a list of integer numbers, store an empty list
 l = [1, 2, 3]                  #│   in l̲, store a list with items 1, 2 and 3

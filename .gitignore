@@ -1,5 +1,9 @@
+# IDE configuration files
+.idea
+
 .DS_Store
 /node_modules
 web/bundle.js*
 /tools/deploy-jpp.sh
 sample_src/tmp*
+__pycache__

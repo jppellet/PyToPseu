@@ -10,7 +10,18 @@ import * as LZString from "lz-string"
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-import PyToPseu from '../pytopseu.py'
+import pseudocodeDictionaryPythonCode from '../pytopseu/pseudocode_dictionary.py'
+// @ts-ignore
+import englishPseudocodeDictionaryPythonCode from '../pytopseu/english_pseudocode_dictionary.py'
+// @ts-ignore
+import frenchPseudocodeDictionaryPythonCode from '../pytopseu/french_pseudocode_dictionary.py'
+// @ts-ignore
+import commonPythonCode from '../pytopseu/common.py'
+// @ts-ignore
+import pyToPseuPythonCode from '../pytopseu/pytopseu.py'
+// @ts-ignore
+import initPythonCode from '../pytopseu/__init__.py'
+/* eslint-enable @typescript-eslint/ban-ts-comment */
 
 type InitPyodide = ReturnType<typeof loadPyodide>
 
@@ -130,11 +141,14 @@ async function main() {
     async function updateAnnotationsFor(userCode: string) {
         try {
             const pyodide = await initPyodide
-            await pyodide.runPythonAsync(
-                `__user_code__ = ${JSON.stringify(userCode)}\n` +
-                `__user_lang__ = ${JSON.stringify(currentLang)}\n`
-            )
-            let runResult = await pyodide.runPythonAsync(PyToPseu)
+            let runResult = await pyodide.runPythonAsync(
+                'import pytopseu\n' +
+				'pytopseu.annotate_code_and_get_as_json(' +
+					`${JSON.stringify(userCode)}, ` +
+					`${JSON.stringify(currentLang)}, ` +
+					'underline_variable_names=True' +
+				')'
+            );
             if (typeof runResult === "object" && "toJs" in runResult) {
                 runResult = runResult.toJs()
                 if ("target" in runResult) {
@@ -214,11 +228,29 @@ async function main() {
     // buttons.appendChild(annotateButton)
 
     // load pyodide and external packages
-    initPyodide = doLoadPyodide().then((pyodide) => {
-        return pyodide.loadPackage(BASE_EXTERNAL_PACKAGES).then(() => {
-            return pyodide
+    initPyodide = doLoadPyodide()
+        .then((pyodide) => {
+            return pyodide.loadPackage(BASE_EXTERNAL_PACKAGES).then(() => {
+                return pyodide
+            })
         })
-    })
+        .then(async pyodide => {
+            pyodide.FS.mkdir('/app');
+            pyodide.FS.mkdir('/app/pytopseu');
+
+            pyodide.FS.writeFile('/app/pytopseu/pseudocode_dictionary.py', pseudocodeDictionaryPythonCode);
+            pyodide.FS.writeFile('/app/pytopseu/english_pseudocode_dictionary.py', englishPseudocodeDictionaryPythonCode);
+            pyodide.FS.writeFile('/app/pytopseu/french_pseudocode_dictionary.py', frenchPseudocodeDictionaryPythonCode);
+            pyodide.FS.writeFile('/app/pytopseu/common.py', commonPythonCode);
+            pyodide.FS.writeFile('/app/pytopseu/pytopseu.py', pyToPseuPythonCode);
+            pyodide.FS.writeFile('/app/pytopseu/__init__.py', initPythonCode);
+
+            await pyodide.runPythonAsync('import sys\nsys.path.append("/app")');
+
+            return pyodide;
+        });
+
+
 
     let initialCodeFromParam: string | undefined = undefined
     const compressedCode = url.searchParams.get('t')
