@@ -7,7 +7,7 @@ from typing import Callable, Iterable, Iterator, NamedTuple, Type, TypeVar
 from typing_extensions import TypeIs
 
 from .common import *
-from .pseudocode_dictionary import PseudocodeDictionary
+from .dictionaries.pseudocode_dictionary import PseudocodeDictionary
 
 # See https://docs.python.org/3/library/ast.html#module-ast
 
