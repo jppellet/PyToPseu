@@ -892,7 +892,13 @@ class Analyzer(ast.NodeVisitor):
     def visit_collection(self, node: ast.List | ast.Set | ast.Tuple, name: str) -> None:
         num_elems = len(node.elts)
         if num_elems == 0:
-            self.append(node, self.pd.empty_collection.format(coll=name))
+            match node:
+                case ast.List():
+                    self.append(node, self.pd.an_empty_list)
+                case ast.Set():
+                    self.append(node, self.pd.an_empty_set)
+                case ast.Tuple():
+                    self.append(node, self.pd.an_empty_tuple)
         elif num_elems == 1:
             self.append(node, self.pd.collection_with_one_item.format(coll=name))
             self.visit(node.elts[0])
