@@ -8,9 +8,9 @@
     "compile-watch": "tsc -p tsconfig.json --watch",
     "lint": "eslint .",
     "lint-watch": "npm-watch lint",
-    "bundle": "./tools/build.js",
+    "bundle": "node tools/build.js",
     "bundle-watch": "npm-watch bundle",
-    "server": "./tools/local_server.py 8089",
+    "server": "python3 tools/local_server.py 8089",
     "deploy": "./tools/deploy-jpp.sh",
     "testfiles-watch": "npm-watch testfiles",
     "testfiles": "python3 -m pytopseu.test"
