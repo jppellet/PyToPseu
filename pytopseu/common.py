@@ -9,6 +9,10 @@ from .french_pseudocode_dictionary import FrenchPseudocodeDictionary
 
 # Constants
 
+PYTHON_EXTENSION = ".py"
+MD_EXTENSION = ".md"
+TEXT_EXTENSION = ".txt"
+
 MAX_LINE_WIDTH = 60
 V_BAR = "│"
 PYTHON_ANN_SEP = "#" + V_BAR
@@ -29,9 +33,9 @@ language_pseudocode_dictionaries = {
     'fr': FrenchPseudocodeDictionary()
 }
 
-text_pseudocode_format = PseudocodeFormat('.txt')
-markdown_pseudocode_format = PseudocodeFormat('.md')
-python_pseudocode_format = PseudocodeFormat('.py')
+text_pseudocode_format = PseudocodeFormat(TEXT_EXTENSION)
+markdown_pseudocode_format = PseudocodeFormat(MD_EXTENSION)
+python_pseudocode_format = PseudocodeFormat(PYTHON_EXTENSION)
 
 # Functions
 
