@@ -8,6 +8,12 @@ from .common import *
 from .pseudocode_dictionary import PseudocodeDictionary
 from .pytopseu import annotate_code
 
+# Constants
+
+INPUT_FOLDER = "sample_src/input"
+OUTPUT_FOLDER = "sample_src/output"
+ANNOTATED_SUFFIX = "_ann.py"
+
 # Functions
 
 def annotate_file_for_all_supported_languages(file, pseudocode_format):
@@ -40,9 +46,11 @@ def annotate_file(
     file_extension = pseudocode_format.file_extension
 
     if pseudocode_format == python_pseudocode_format:
-        file_extension = '_ann' + file_extension
+        file_extension = ANNOTATED_SUFFIX
 
-    outfile = os.path.splitext(file)[0] + "_" + lang + file_extension
+    current_filename = os.path.split(file)[1]
+    current_filename_base = os.path.splitext(current_filename)[0]
+    outfile = os.path.join(OUTPUT_FOLDER, current_filename_base + "_" + lang + file_extension)
 
     with open(outfile, "w", encoding="utf8") as out_file:
         out_file.write("\n".join(annotated.output))
@@ -51,11 +59,11 @@ def annotate_file(
 
 
 def annotate_all(format: PseudocodeFormat) -> None:
-    for file in sorted(os.listdir("sample_src")):
-        if file.endswith(".py") and not file.endswith("_ann.py"):
+    for file in sorted(os.listdir(INPUT_FOLDER)):
+        if file.endswith(PYTHON_EXTENSION) and not file.endswith(ANNOTATED_SUFFIX):
             for lang in get_supported_languages():
                 annotate_file(
-                    os.path.join("sample_src", file),
+                    os.path.join(INPUT_FOLDER, file),
                     format,
                     language_pseudocode_dictionaries[lang]
                 )
