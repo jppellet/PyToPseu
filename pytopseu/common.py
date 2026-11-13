@@ -3,9 +3,9 @@
 
 from dataclasses import dataclass
 
-from .pseudocode_dictionary import PseudocodeDictionary
-from .english_pseudocode_dictionary import EnglishPseudocodeDictionary
-from .french_pseudocode_dictionary import FrenchPseudocodeDictionary
+from .dictionaries.pseudocode_dictionary import PseudocodeDictionary
+from .dictionaries.english_pseudocode_dictionary import EnglishPseudocodeDictionary
+from .dictionaries.french_pseudocode_dictionary import FrenchPseudocodeDictionary
 
 # Constants
 

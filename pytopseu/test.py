@@ -5,7 +5,7 @@ import os
 import sys
 
 from .common import *
-from .pseudocode_dictionary import PseudocodeDictionary
+from .dictionaries.pseudocode_dictionary import PseudocodeDictionary
 from .pytopseu import annotate_code
 
 # Constants
