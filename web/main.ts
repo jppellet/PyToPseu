@@ -10,11 +10,11 @@ import * as LZString from "lz-string"
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-import pseudocodeDictionaryPythonCode from '../pytopseu/pseudocode_dictionary.py'
+import pseudocodeDictionaryPythonCode from '../pytopseu/dictionaries/pseudocode_dictionary.py'
 // @ts-ignore
-import englishPseudocodeDictionaryPythonCode from '../pytopseu/english_pseudocode_dictionary.py'
+import englishPseudocodeDictionaryPythonCode from '../pytopseu/dictionaries/english_pseudocode_dictionary.py'
 // @ts-ignore
-import frenchPseudocodeDictionaryPythonCode from '../pytopseu/french_pseudocode_dictionary.py'
+import frenchPseudocodeDictionaryPythonCode from '../pytopseu/dictionaries/french_pseudocode_dictionary.py'
 // @ts-ignore
 import commonPythonCode from '../pytopseu/common.py'
 // @ts-ignore
